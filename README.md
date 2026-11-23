@@ -9,7 +9,11 @@ leave notes for collaborators and walk the rooms at eye level.
 npm install
 npm run dev        # http://localhost:5173
 npm run build      # type-check + production build
+npm run test:db    # check the database access rules
 ```
+
+By default the app runs in **local mode**: everything is stored in this browser. To use real online
+accounts, sharing and image storage, connect it to Supabase: see [docs/SUPABASE_SETUP.md](docs/SUPABASE_SETUP.md).
 
 ## What's in the prototype
 
@@ -44,8 +48,12 @@ src/
     building.ts   Declarative floor plan -> wall pieces + hangable surfaces
   services/
     contracts.ts  Interfaces the UI depends on (Auth, Users, Layouts, Shares, Notes, Assets)
-    local/        Prototype implementations: localStorage + IndexedDB (images)
-    index.tsx     Composition root – the one place to swap in API-backed services
+    local/        Local mode: localStorage + IndexedDB (images)
+    supabase/     Online mode: Supabase auth, Postgres, Storage, Realtime
+    index.tsx     Composition root – picks the backend from .env.local
+supabase/
+  migrations/     Database schema, access rules and storage policies
+  tests/          Access-rule tests (npm run test:db)
   auth/           Auth context
   pages/          Sign-in and layouts dashboard
   editor/

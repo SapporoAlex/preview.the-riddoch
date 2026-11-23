@@ -1,0 +1,127 @@
+/**
+ * Core domain model. These types are deliberately transport-agnostic so the
+ * same shapes can be returned by the local prototype services today and by a
+ * REST/GraphQL backend later.
+ */
+
+export type ID = string;
+export type ISODate = string;
+
+export interface User {
+  id: ID;
+  email: string;
+  displayName: string;
+  createdAt: ISODate;
+}
+
+/** The subset of a user that is safe to show to other users. */
+export type PublicUser = Pick<User, 'id' | 'email' | 'displayName'>;
+
+export type FrameStyle = 'none' | 'black' | 'white' | 'oak';
+
+/**
+ * A stand-in for a work that isn't available yet: a blank panel with editable
+ * text, shown at the real size so the hang can be planned around it.
+ */
+export interface PlaceholderSpec {
+  text: string;
+}
+
+/**
+ * A work hung on a wall surface. Positions are in metres in surface space.
+ * Either `assetId` (an uploaded image) or `placeholder` is set.
+ */
+export interface Artwork {
+  id: ID;
+  assetId?: ID;
+  placeholder?: PlaceholderSpec;
+  title: string;
+  surfaceId: string;
+  /** Horizontal distance (m) from the surface's left edge to the artwork centre. */
+  u: number;
+  /** Height (m) from the floor to the artwork centre. */
+  v: number;
+  widthCm: number;
+  heightCm: number;
+  frame: FrameStyle;
+}
+
+export interface RoomSettings {
+  lightsOn: boolean;
+}
+
+export const LAYOUT_SCHEMA_VERSION = 1;
+
+export interface Layout {
+  id: ID;
+  schemaVersion: number;
+  ownerId: ID;
+  name: string;
+  /** Which building model this layout was designed for. */
+  buildingId: string;
+  artworks: Artwork[];
+  /** surfaceId -> hex colour (#rrggbb). Missing entries use the default white. */
+  wallPaint: Record<string, string>;
+  rooms: Record<string, RoomSettings>;
+  thumbnailAssetId?: ID;
+  createdAt: ISODate;
+  updatedAt: ISODate;
+}
+
+export interface LayoutSummary {
+  id: ID;
+  name: string;
+  ownerId: ID;
+  ownerName: string;
+  artworkCount: number;
+  thumbnailAssetId?: ID;
+  updatedAt: ISODate;
+}
+
+export type SharePermission = 'view';
+
+export interface Share {
+  id: ID;
+  layoutId: ID;
+  ownerId: ID;
+  recipientId: ID;
+  recipientEmail: string;
+  permission: SharePermission;
+  createdAt: ISODate;
+}
+
+/** Where a speech-bubble note is pinned. */
+export type NoteAnchor =
+  | { kind: 'surface'; surfaceId: string; u: number; v: number }
+  | {
+      kind: 'artwork';
+      artworkId: ID;
+      /** Offset (m) from the artwork centre. */
+      du: number;
+      dv: number;
+      /** Fallback position if the artwork is later removed. */
+      surfaceId: string;
+      u: number;
+      v: number;
+    };
+
+export interface Note {
+  id: ID;
+  layoutId: ID;
+  authorId: ID;
+  authorName: string;
+  text: string;
+  anchor: NoteAnchor;
+  createdAt: ISODate;
+}
+
+export interface Asset {
+  id: ID;
+  ownerId: ID;
+  mimeType: string;
+  /** Pixel dimensions of the stored image. */
+  width: number;
+  height: number;
+  byteSize: number;
+  createdAt: ISODate;
+}
