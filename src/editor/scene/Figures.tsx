@@ -64,7 +64,7 @@ export function Figures({ building }: { building: Building }) {
         const mx = ri % 2 === 0 ? 1 : -1;
         return SPOTS.map(([dx, dz, yaw, pose], i) => ({
           key: `${room.id}-${i}`,
-          position: [cx + dx * mx, 0, cz + dz] as [number, number, number],
+          position: [cx + dx * mx, room.floor ?? 0, cz + dz] as [number, number, number],
           yaw: mx === 1 ? yaw : -yaw,
           pose,
         }));

@@ -10,6 +10,7 @@ import { Icon } from '@/ui/Icon';
 import { errorMessage, toast } from '@/ui/toast';
 import { GalleryCanvas } from './scene/GalleryCanvas';
 import { sceneRefs } from './scene/sceneRefs';
+import { deleteObject, deletePartition, normaliseAngle, rotatePartition } from './actions';
 import { useEditor } from './store';
 import { HintBar } from './ui/HintBar';
 import { ShareDialog } from './ui/ShareDialog';
@@ -186,7 +187,23 @@ export default function EditorPage({ layoutId }: { layoutId: string }) {
               l.artworks = l.artworks.filter((a) => a.id !== id);
             });
             st.select(null);
+          } else if (owner && st.selection?.kind === 'partition') {
+            deletePartition(st.selection.id);
+          } else if (owner && st.selection?.kind === 'object') {
+            deleteObject(st.selection.id);
           }
+          break;
+        case 'r':
+        case 'R': {
+          // Rotate the selected movable wall, or the one about to be placed, by 15°.
+          if (!owner || !building) break;
+          const step = e.shiftKey ? -15 : 15;
+          if (st.selection?.kind === 'partition') rotatePartition(building, st.selection.id, step);
+          else if (st.tool === 'walls') st.setWallDraft({ rotation: normaliseAngle(st.wallDraft.rotation + (step * Math.PI) / 180) });
+          break;
+        }
+        case 'b':
+          if (owner) st.setTool('walls');
           break;
         case 'v':
           st.setTool('select');
@@ -204,7 +221,7 @@ export default function EditorPage({ layoutId }: { layoutId: string }) {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [save]);
+  }, [save, building]);
 
   // ---- Unsaved-changes guard ----
   useEffect(() => {

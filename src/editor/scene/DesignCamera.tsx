@@ -8,7 +8,11 @@ import { useEditor } from '../store';
 import { axis, useHeldKeys } from './keys';
 import { sceneRefs } from './sceneRefs';
 
-const DEFAULT_POS: [number, number, number] = [6, 26, 30];
+/** Opening view: from the south-east, far enough back to see the whole building. */
+function defaultPosition(b: Building): [number, number, number] {
+  const size = Math.max(b.bounds.x1 - b.bounds.x0, b.bounds.z1 - b.bounds.z0);
+  return [size * 0.2, size * 0.95, size * 0.95];
+}
 const DEFAULT_TARGET: [number, number, number] = [0, 0, 0];
 
 /**
@@ -26,7 +30,7 @@ export function DesignCamera({ building }: { building: Building }) {
     const c = controls.current;
     if (!c) return;
     const view = sceneRefs.designView;
-    camera.position.set(...(view?.position ?? DEFAULT_POS));
+    camera.position.set(...(view?.position ?? defaultPosition(building)));
     c.target.set(...(view?.target ?? DEFAULT_TARGET));
     c.update();
     sceneRefs.controls = c;
@@ -37,7 +41,7 @@ export function DesignCamera({ building }: { building: Building }) {
       };
       sceneRefs.controls = null;
     };
-  }, [camera]);
+  }, [camera, building]);
 
   const fwd = new THREE.Vector3();
   const right = new THREE.Vector3();

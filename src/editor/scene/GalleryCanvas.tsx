@@ -10,6 +10,7 @@ import { Figures } from './Figures';
 import { Interaction } from './Interaction';
 import { Lighting } from './Lighting';
 import { Notes } from './Notes';
+import { Objects } from './Objects';
 import { sceneRefs } from './sceneRefs';
 import { VisitCamera } from './VisitCamera';
 
@@ -32,6 +33,7 @@ export function GalleryCanvas({ building }: { building: BuildingModel }) {
       <Lighting building={building} />
       <Building building={building} />
       <Artworks building={building} />
+      <Objects building={building} />
       <Figures building={building} />
       <Notes building={building} />
       {mode === 'design' ? <DesignCamera building={building} /> : <VisitCamera building={building} />}

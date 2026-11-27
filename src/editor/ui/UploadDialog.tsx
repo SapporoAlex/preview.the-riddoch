@@ -7,12 +7,13 @@ import { Icon } from '@/ui/Icon';
 import { Modal } from '@/ui/Modal';
 import { errorMessage, toast } from '@/ui/toast';
 import { useEditor } from '../store';
+import { ObjectUploadDialog } from './ObjectUploadDialog';
 
 const MAX_W_CM = 1500;
 const MAX_H_CM = 480;
 const FRAMES: FrameStyle[] = ['none', 'black', 'white', 'oak'];
 
-type Kind = 'image' | 'placeholder';
+export type Kind = 'image' | 'placeholder' | 'object';
 
 export function UploadDialog({ onClose }: { onClose(): void }) {
   const user = useUser();
@@ -36,11 +37,16 @@ export function UploadDialog({ onClose }: { onClose(): void }) {
   useEffect(() => () => void (preview && URL.revokeObjectURL(preview)), [preview]);
 
   const isImage = kind === 'image';
+  // (The object option has its own form; see ObjectUploadDialog.)
   // Placeholders have no intrinsic proportions, so the lock only applies to images.
   const locked = isImage && lock && !!image;
   const aspect = image ? image.sourceHeight / image.sourceWidth : 1;
 
   const switchKind = (k: Kind) => {
+    if (k === 'object') {
+      setKind(k);
+      return;
+    }
     setKind(k);
     setError(null);
     if (k === 'placeholder' && !width && !height) {
@@ -85,9 +91,9 @@ export function UploadDialog({ onClose }: { onClose(): void }) {
       : !(w > 0 && h > 0)
         ? 'Enter a positive width and height.'
         : w > MAX_W_CM
-          ? `Width can be at most ${MAX_W_CM} cm (the longest wall is 15 m).`
+          ? `Width can be at most ${MAX_W_CM} cm (wider than any wall).`
           : h > MAX_H_CM
-            ? `Height can be at most ${MAX_H_CM} cm (ceilings are 5 m).`
+            ? `Height can be at most ${MAX_H_CM} cm (taller than any wall).`
             : null;
   const sizeOk = w > 0 && h > 0 && !sizeError;
   const ready = isImage ? !!image && sizeOk : sizeOk;
@@ -175,9 +181,11 @@ export function UploadDialog({ onClose }: { onClose(): void }) {
     </>
   );
 
+  if (kind === 'object') return <ObjectUploadDialog onClose={onClose} onSwitch={switchKind} />;
+
   return (
     <Modal
-      title="Add to a wall"
+      title="Add to the gallery"
       onClose={onClose}
       width={580}
       footer={
@@ -191,14 +199,7 @@ export function UploadDialog({ onClose }: { onClose(): void }) {
         </>
       }
     >
-      <div className="segmented segmented-sm kind-switch" role="tablist">
-        <button role="tab" aria-selected={isImage} className={isImage ? 'on' : ''} onClick={() => switchKind('image')}>
-          <Icon name="image" size={15} /> Upload image
-        </button>
-        <button role="tab" aria-selected={!isImage} className={!isImage ? 'on' : ''} onClick={() => switchKind('placeholder')}>
-          <Icon name="edit" size={15} /> Placeholder
-        </button>
-      </div>
+      <KindSwitch kind={kind} onChange={switchKind} />
 
       {!isImage ? (
         <div className="upload-grid">
@@ -286,5 +287,22 @@ export function UploadDialog({ onClose }: { onClose(): void }) {
         }}
       />
     </Modal>
+  );
+}
+
+export function KindSwitch({ kind, onChange }: { kind: Kind; onChange(k: Kind): void }) {
+  const tabs: { id: Kind; label: string; icon: 'image' | 'edit' | 'cube3d' }[] = [
+    { id: 'image', label: 'Image', icon: 'image' },
+    { id: 'placeholder', label: 'Placeholder', icon: 'edit' },
+    { id: 'object', label: '3D object', icon: 'cube3d' },
+  ];
+  return (
+    <div className="segmented segmented-sm kind-switch" role="tablist">
+      {tabs.map((t) => (
+        <button key={t.id} role="tab" aria-selected={kind === t.id} className={kind === t.id ? 'on' : ''} onClick={() => onChange(t.id)}>
+          <Icon name={t.icon} size={15} /> {t.label}
+        </button>
+      ))}
+    </div>
   );
 }

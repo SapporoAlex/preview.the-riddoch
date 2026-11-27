@@ -10,7 +10,7 @@ interface LayoutRow {
   name: string;
   building_id: string;
   schema_version: number;
-  doc: Pick<Layout, 'artworks' | 'wallPaint' | 'rooms'> | null;
+  doc: Pick<Layout, 'artworks' | 'wallPaint' | 'rooms' | 'partitions' | 'objects'> | null;
   thumbnail_asset_id: string | null;
   created_at: string;
   updated_at: string;
@@ -39,6 +39,8 @@ function toLayout(r: LayoutRow): Layout {
     artworks: r.doc?.artworks ?? [],
     wallPaint: r.doc?.wallPaint ?? {},
     rooms: r.doc?.rooms ?? defaultRooms(r.building_id),
+    partitions: r.doc?.partitions ?? [],
+    objects: r.doc?.objects ?? [],
     thumbnailAssetId: r.thumbnail_asset_id ?? undefined,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
@@ -61,7 +63,13 @@ const toRow = (l: Layout) => ({
   name: l.name,
   building_id: l.buildingId,
   schema_version: LAYOUT_SCHEMA_VERSION,
-  doc: { artworks: l.artworks, wallPaint: l.wallPaint, rooms: l.rooms },
+  doc: {
+    artworks: l.artworks,
+    wallPaint: l.wallPaint,
+    rooms: l.rooms,
+    partitions: l.partitions ?? [],
+    objects: l.objects ?? [],
+  },
   thumbnail_asset_id: l.thumbnailAssetId ?? null,
 });
 

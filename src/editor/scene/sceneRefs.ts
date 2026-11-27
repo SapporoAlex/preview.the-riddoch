@@ -12,6 +12,7 @@ export const sceneRefs = {
   walls: createRef<Group>(),
   surfaces: new Map<string, Object3D>(),
   artworks: new Map<string, Object3D>(),
+  objects: new Map<string, Object3D>(),
   controls: null as OrbitControlsImpl | null,
   camera: null as Camera | null,
   /** Saved orbit camera so returning from visit mode restores the view. */

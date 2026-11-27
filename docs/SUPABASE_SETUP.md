@@ -16,7 +16,8 @@ Takes about 15 minutes. Everything here is on Supabase's free plan.
 
 1. In the project, open **SQL Editor → New query**.
 2. Paste the whole of [`supabase/migrations/0001_init.sql`](../supabase/migrations/0001_init.sql) and click **Run**.
-   You should see "Success. No rows returned".
+   You should see "Success. No rows returned". Then do the same with
+   [`0002_objects.sql`](../supabase/migrations/0002_objects.sql) (lets viewers see 3D object photos).
 3. Check **Table Editor**: you should see `profiles`, `layouts`, `shares`, `notes` and `assets`.
    **Storage** should show a private bucket called `assets`.
 
@@ -79,8 +80,8 @@ once the app is connected.
 
 ## Checking the access rules
 
-`npm run test:db` runs the migrations in a throwaway in-memory Postgres and checks 45 access rules as
-three different users: owner, viewer and stranger. Run it after any change to the SQL.
+`npm run test:db` runs the migrations in a throwaway in-memory Postgres and checks the access rules as
+three different users: owner, viewer and stranger (48 checks). Run it after any change to the SQL.
 
 ## Free-plan limits to keep in mind
 

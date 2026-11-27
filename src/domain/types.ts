@@ -46,6 +46,39 @@ export interface Artwork {
   frame: FrameStyle;
 }
 
+/**
+ * A movable gallery wall, 30 cm thick, standing on the floor. Both faces can
+ * be hung and painted; their surface ids are `<id>:a` and `<id>:b`.
+ */
+export interface Partition {
+  id: ID;
+  /** Plan centre, metres. */
+  x: number;
+  z: number;
+  /** Rotation about the vertical axis, radians. */
+  rotation: number;
+  lengthM: number;
+  heightM: number;
+}
+
+/**
+ * A 3D object shown as a photo standing on a plinth. The photo always turns
+ * to face the viewer, which reads as a solid object when walking around.
+ */
+export interface GalleryObject {
+  id: ID;
+  assetId: ID;
+  title: string;
+  x: number;
+  z: number;
+  /** Real-world size of the object itself (width comes from the photo's proportions). */
+  heightCm: number;
+  widthCm: number;
+  /** Height of the plinth it stands on; 0 = straight on the floor. */
+  plinthHeightCm: number;
+  plinthColor: string;
+}
+
 export interface RoomSettings {
   lightsOn: boolean;
 }
@@ -63,6 +96,9 @@ export interface Layout {
   /** surfaceId -> hex colour (#rrggbb). Missing entries use the default white. */
   wallPaint: Record<string, string>;
   rooms: Record<string, RoomSettings>;
+  /** Optional so layouts saved before these existed still load. */
+  partitions?: Partition[];
+  objects?: GalleryObject[];
   thumbnailAssetId?: ID;
   createdAt: ISODate;
   updatedAt: ISODate;

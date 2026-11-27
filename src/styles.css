@@ -1605,3 +1605,26 @@ textarea:focus {
   font-size: 13px;
   margin: 4px 0 14px;
 }
+
+/* Movable walls and objects */
+.angle-row {
+  display: grid;
+  grid-template-columns: auto 1fr auto 44px;
+  gap: 6px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+.angle-row input[type='range'] {
+  width: 100%;
+}
+.angle-value {
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.flip-x {
+  transform: scaleX(-1);
+}
+.art-preview-object {
+  background: repeating-conic-gradient(#e6e3dd 0% 25%, #f3f1ec 0% 50%) 50% / 16px 16px;
+}

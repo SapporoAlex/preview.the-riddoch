@@ -3,8 +3,30 @@ import type { Access } from '@/domain/permissions';
 import type { FrameStyle, ID, Layout, Note, NoteAnchor, PlaceholderSpec, User } from '@/domain/types';
 
 export type Mode = 'design' | 'visit';
-export type Tool = 'select' | 'place' | 'paint' | 'note';
-export type Selection = { kind: 'artwork'; id: ID } | { kind: 'surface'; id: string } | null;
+export type Tool = 'select' | 'place' | 'paint' | 'note' | 'walls';
+export type Selection =
+  | { kind: 'artwork'; id: ID }
+  | { kind: 'surface'; id: string }
+  | { kind: 'partition'; id: ID }
+  | { kind: 'object'; id: ID }
+  | null;
+
+/** An uploaded 3D-object photo waiting to be placed on the floor. */
+export interface PendingObject {
+  assetId: ID;
+  title: string;
+  heightCm: number;
+  widthCm: number;
+  plinthHeightCm: number;
+}
+
+/** Preview of a movable wall or object under the cursor before it's placed. */
+export interface FloorGhost {
+  x: number;
+  z: number;
+  floorY: number;
+  valid: boolean;
+}
 
 export interface PendingArtwork {
   assetId?: ID;
@@ -59,7 +81,11 @@ interface EditorState {
   tool: Tool;
   selection: Selection;
   pending: PendingArtwork | null;
+  pendingObject: PendingObject | null;
   ghost: Ghost | null;
+  floorGhost: FloorGhost | null;
+  /** Size and angle for the next movable wall placed with the walls tool. */
+  wallDraft: { lengthM: number; heightM: number; rotation: number };
   hoverSurfaceId: string | null;
   paintColor: string;
   cutaway: boolean;
@@ -103,7 +129,10 @@ interface EditorActions {
   setTool(tool: Tool): void;
   select(sel: Selection): void;
   setPending(p: PendingArtwork | null): void;
+  setPendingObject(p: PendingObject | null): void;
   setGhost(g: Ghost | null): void;
+  setFloorGhost(g: FloorGhost | null): void;
+  setWallDraft(patch: Partial<EditorState['wallDraft']>): void;
   setHoverSurface(id: string | null): void;
   setPaintColor(hex: string): void;
   setCutaway(on: boolean): void;
@@ -135,7 +164,10 @@ const initial: EditorState = {
   tool: 'select',
   selection: null,
   pending: null,
+  pendingObject: null,
   ghost: null,
+  floorGhost: null,
+  wallDraft: { lengthM: 3, heightM: 3, rotation: 0 },
   hoverSurfaceId: null,
   paintColor: '#f4f1ea',
   cutaway: true,
@@ -202,17 +234,24 @@ export const useEditor = create<EditorState & EditorActions>((set, get) => ({
   markSaved: (layout) => set({ layout, dirty: false, saving: false }),
   setSaving: (saving) => set({ saving }),
 
-  setMode: (mode) => set({ mode, ghost: null, hoverSurfaceId: null, activeNoteId: null, noteDraft: null }),
+  setMode: (mode) =>
+    set({ mode, ghost: null, floorGhost: null, hoverSurfaceId: null, activeNoteId: null, noteDraft: null }),
   setTool: (tool) =>
     set((s) => ({
       tool,
       ghost: null,
+      floorGhost: null,
       noteDraft: null,
       pending: tool === 'place' ? s.pending : null,
+      pendingObject: tool === 'place' ? s.pendingObject : null,
     })),
   select: (selection) => set({ selection }),
-  setPending: (pending) => set({ pending, tool: pending ? 'place' : 'select', ghost: null }),
+  setPending: (pending) => set({ pending, pendingObject: null, tool: pending ? 'place' : 'select', ghost: null }),
+  setPendingObject: (pendingObject) =>
+    set({ pendingObject, pending: null, tool: pendingObject ? 'place' : 'select', floorGhost: null }),
   setGhost: (ghost) => set({ ghost }),
+  setFloorGhost: (floorGhost) => set({ floorGhost }),
+  setWallDraft: (patch) => set((s) => ({ wallDraft: { ...s.wallDraft, ...patch } })),
   setHoverSurface: (hoverSurfaceId) => get().hoverSurfaceId !== hoverSurfaceId && set({ hoverSurfaceId }),
   setPaintColor: (paintColor) => set({ paintColor }),
   setCutaway: (cutaway) => set({ cutaway }),
@@ -237,7 +276,12 @@ export const useEditor = create<EditorState & EditorActions>((set, get) => ({
 
   validateSelection: () => {
     const { selection, layout } = get();
-    if (selection?.kind === 'artwork' && !layout?.artworks.some((a) => a.id === selection.id)) set({ selection: null });
+    const gone =
+      (selection?.kind === 'artwork' && !layout?.artworks.some((a) => a.id === selection.id)) ||
+      (selection?.kind === 'partition' && !layout?.partitions?.some((p) => p.id === selection.id)) ||
+      (selection?.kind === 'object' && !layout?.objects?.some((o) => o.id === selection.id)) ||
+      (selection?.kind === 'surface' && selection.id.includes(':') && !layout?.partitions?.some((p) => selection.id.startsWith(p.id + ':')));
+    if (gone) set({ selection: null });
   },
 }));
 

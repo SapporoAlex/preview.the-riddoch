@@ -4,6 +4,7 @@ import type { Building } from '@/domain/building';
 import { can } from '@/domain/permissions';
 import type { Layout, Note, NoteAnchor } from '@/domain/types';
 import { initials, timeAgo } from '@/lib/format';
+import { getSurface } from '@/domain/world';
 import { useEditor } from '../store';
 import { SurfaceFrame } from './Artworks';
 import { sceneRefs } from './sceneRefs';
@@ -29,7 +30,7 @@ export function Notes({ building }: { building: Building }) {
     <>
       {notes.map((n) => {
         const pos = resolveAnchor(n.anchor, layout);
-        const s = building.surfaceById.get(pos.surfaceId);
+        const s = getSurface(building, layout, pos.surfaceId);
         if (!s || cutWalls.includes(s.wallId)) return null;
         return (
           <SurfaceFrame key={n.id} surface={s}>
@@ -94,7 +95,7 @@ function NoteComposer({ building, anchor }: { building: Building; anchor: NoteAn
   const [text, setText] = useState('');
   const [busy, setBusy] = useState(false);
   const pos = resolveAnchor(anchor, layout);
-  const s = building.surfaceById.get(pos.surfaceId);
+  const s = getSurface(building, layout, pos.surfaceId);
   if (!s) return null;
 
   const submit = async () => {

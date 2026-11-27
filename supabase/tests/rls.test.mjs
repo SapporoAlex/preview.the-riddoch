@@ -132,11 +132,20 @@ check('51st artwork upload is refused', /upload_limit_reached/.test(await asErr(
 check('thumbnails do not count toward the limit', !(await asErr(A, `insert into assets (kind, mime_type, width, height, byte_size) values ('thumbnail','image/jpeg', 1, 1, 1)`)));
 check('non-image uploads are refused', !!(await asErr(A, `insert into assets (mime_type, width, height, byte_size) values ('text/html', 1, 1, 1)`)));
 
+// 3D object photos (migration 0002).
+const objAsset = (await as(A, `insert into assets (mime_type, width, height, byte_size, kind) values ('image/png', 10, 10, 100, 'thumbnail') returning id`)).rows[0].id;
+await as(A, `update layouts set doc = doc || jsonb_build_object('objects', jsonb_build_array(jsonb_build_object('id','o1','assetId',$2::text))) where id = $1`, [lay, objAsset]);
+await as(A, `select share_layout($1, 'viewer@example.test')`, [lay]);
+check('viewer can read a 3D object photo on a shared layout', (await as(B, `select id from assets where id=$1`, [objAsset])).rows.length === 1);
+check('stranger cannot read the object photo', (await as(C, `select id from assets where id=$1`, [objAsset])).rows.length === 0);
+await as(A, `delete from shares where layout_id=$1`, [lay]);
+
 // Unused-image cleanup.
 await db.exec('reset role');
 await db.query(`update assets set created_at = now() - interval '2 hours'`);
 const unusedA = (await as(A, `select unused_asset_ids() as id`)).rows.map((r) => r.id);
 check('cleanup lists old images no layout uses', unusedA.length === 50 && !unusedA.includes(asset.id), `${unusedA.length} listed`);
+check('cleanup keeps 3D object photos that are in use', !unusedA.includes(objAsset));
 check('cleanup never lists someone else\'s images', (await as(B, `select unused_asset_ids() as id`)).rows.length === 0);
 const fresh = (await as(A, `insert into assets (kind, mime_type, width, height, byte_size) values ('thumbnail','image/png',1,1,1) returning id`)).rows[0].id;
 check('cleanup skips images uploaded in the last hour', !(await as(A, `select unused_asset_ids() as id`)).rows.some((r) => r.id === fresh));

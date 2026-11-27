@@ -3,6 +3,7 @@ import { Suspense, memo, useEffect, useMemo, useRef, type ReactNode } from 'reac
 import * as THREE from 'three';
 import { surfaceRotationY, type Building, type Surface } from '@/domain/building';
 import type { Artwork, FrameStyle } from '@/domain/types';
+import { getSurface } from '@/domain/world';
 import { useEditor } from '../store';
 import { SURFACE_OFFSET } from './Building';
 import { sceneRefs } from './sceneRefs';
@@ -18,7 +19,7 @@ const FRAME: Record<FrameStyle, { border: number; depth: number; color: string; 
 export function SurfaceFrame({ surface, children }: { surface: Surface; children: ReactNode }) {
   return (
     <group
-      position={[surface.origin[0], 0, surface.origin[1]]}
+      position={[surface.origin[0], surface.floorY, surface.origin[1]]}
       rotation={[0, surfaceRotationY(surface), 0]}
     >
       {children}
@@ -28,6 +29,7 @@ export function SurfaceFrame({ surface, children }: { surface: Surface; children
 
 export function Artworks({ building }: { building: Building }) {
   const artworks = useEditor((s) => s.layout?.artworks ?? []);
+  const partitions = useEditor((s) => s.layout?.partitions);
   const cutWalls = useEditor((s) => s.cutWalls);
   const bySurface = useMemo(() => {
     const m = new Map<string, Artwork[]>();
@@ -38,7 +40,7 @@ export function Artworks({ building }: { building: Building }) {
   return (
     <>
       {[...bySurface.entries()].map(([surfaceId, list]) => {
-        const surface = building.surfaceById.get(surfaceId);
+        const surface = getSurface(building, { partitions }, surfaceId);
         if (!surface || cutWalls.includes(surface.wallId)) return null;
         return (
           <SurfaceFrame key={surfaceId} surface={surface}>
@@ -231,7 +233,7 @@ function PlacementGhost({ building }: { building: Building }) {
   const pending = useEditor((s) => s.pending);
   const url = useEditor((s) => (s.pending?.assetId ? s.assetUrls[s.pending.assetId] : undefined));
   if (!ghost || !pending) return null;
-  const surface = building.surfaceById.get(ghost.surfaceId);
+  const surface = getSurface(building, useEditor.getState().layout, ghost.surfaceId);
   if (!surface) return null;
   return (
     <SurfaceFrame surface={surface}>

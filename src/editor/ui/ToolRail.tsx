@@ -11,8 +11,9 @@ interface ToolDef {
 
 const TOOLS: ToolDef[] = [
   { id: 'select', label: 'Select & move', icon: 'cursor', key: 'V' },
-  { id: 'upload', label: 'Add image or placeholder', icon: 'image', key: 'I', ownerOnly: true },
-  { id: 'paint', label: 'Paint walls', icon: 'paint', key: 'P', ownerOnly: true },
+  { id: 'upload', label: 'Add image, placeholder or object', icon: 'image', key: 'I', ownerOnly: true },
+  { id: 'walls', label: 'Movable walls', icon: 'partition', key: 'B', ownerOnly: true },
+  { id: 'paint', label: 'Paint walls & plinths', icon: 'paint', key: 'P', ownerOnly: true },
   { id: 'note', label: 'Leave a note', icon: 'note', key: 'N' },
 ];
 

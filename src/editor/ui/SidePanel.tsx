@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { rectFitsSurface, surfaceToWorld, type Building } from '@/domain/building';
 import { can } from '@/domain/permissions';
 import type { Artwork, FrameStyle } from '@/domain/types';
+import { allSurfaces, getSurface, isPartitionSurfaceId } from '@/domain/world';
 import { DEFAULT_WALL_COLOR, hexToRgb } from '@/lib/color';
 import { initials, timeAgo } from '@/lib/format';
 import { Icon } from '@/ui/Icon';
@@ -9,6 +10,7 @@ import { toast } from '@/ui/toast';
 import { resolveAnchor } from '../scene/Notes';
 import { useEditor } from '../store';
 import { ColorPicker } from './ColorPicker';
+import { ObjectInspector, PartitionInspector, WallsToolPanel } from './FloorInspectors';
 
 type Tab = 'inspect' | 'notes';
 
@@ -42,6 +44,9 @@ function Inspector({ building }: { building: Building }) {
   if (tool === 'paint') return <PaintPanel building={building} />;
   if (selection?.kind === 'artwork') return <ArtworkInspector building={building} id={selection.id} />;
   if (selection?.kind === 'surface') return <SurfaceInspector building={building} id={selection.id} />;
+  if (selection?.kind === 'partition') return <PartitionInspector building={building} id={selection.id} />;
+  if (selection?.kind === 'object') return <ObjectInspector building={building} id={selection.id} />;
+  if (tool === 'walls') return <WallsToolPanel building={building} />;
   return <Overview building={building} />;
 }
 
@@ -52,20 +57,25 @@ function PaintPanel({ building }: { building: Building }) {
   const setColor = useEditor((s) => s.setPaintColor);
   const selection = useEditor((s) => s.selection);
   const commit = useEditor((s) => s.commit);
-  const surface = selection?.kind === 'surface' ? building.surfaceById.get(selection.id) : undefined;
+  const layout = useEditor((s) => s.layout);
+  const surface = selection?.kind === 'surface' ? getSurface(building, layout, selection.id) : undefined;
   const room = surface && building.spec.rooms.find((r) => r.id === surface.roomId);
 
   return (
     <section className="panel-section">
       <h3>Paint walls</h3>
-      <p className="muted small">Pick a colour, then click any wall in the gallery. Hover a wall to preview.</p>
+      <p className="muted small">
+        Pick a colour, then click any wall, movable wall or plinth. Hover a wall to preview.
+      </p>
       <ColorPicker value={color} onChange={setColor} />
       {room && (
         <button
           className="btn btn-ghost btn-block"
           onClick={() =>
             commit((l) => {
-              building.surfaces.filter((s) => s.roomId === room.id).forEach((s) => (l.wallPaint[s.id] = color));
+              allSurfaces(building, l)
+                .filter((s) => s.roomId === room.id)
+                .forEach((s) => (l.wallPaint[s.id] = color));
             })
           }
         >
@@ -77,7 +87,8 @@ function PaintPanel({ building }: { building: Building }) {
 }
 
 function SurfaceInspector({ building, id }: { building: Building; id: string }) {
-  const surface = building.surfaceById.get(id)!;
+  const layout = useEditor((s) => s.layout);
+  const select = useEditor((s) => s.select);
   const color = useEditor((s) => s.layout?.wallPaint[id] ?? DEFAULT_WALL_COLOR);
   const count = useEditor((s) => s.layout?.artworks.filter((a) => a.surfaceId === id).length ?? 0);
   const owner = useEditor((s) => s.access === 'owner');
@@ -85,10 +96,13 @@ function SurfaceInspector({ building, id }: { building: Building; id: string }) 
   const setPaintColor = useEditor((s) => s.setPaintColor);
   const commit = useEditor((s) => s.commit);
   const rgb = hexToRgb(color);
+  const surface = getSurface(building, layout, id);
+  if (!surface) return <Overview building={building} />;
+  const movable = isPartitionSurfaceId(id);
 
   return (
     <section className="panel-section">
-      <div className="eyebrow">Wall</div>
+      <div className="eyebrow">{movable ? 'Movable wall' : 'Wall'}</div>
       <h3>{surface.label}</h3>
       <dl className="props">
         <dt>Length</dt>
@@ -109,6 +123,11 @@ function SurfaceInspector({ building, id }: { building: Building; id: string }) 
       </div>
       {owner && (
         <div className="stack">
+          {movable && (
+            <button className="btn btn-ghost btn-block" onClick={() => select({ kind: 'partition', id: id.split(':')[0]! })}>
+              <Icon name="partition" size={16} /> Move, rotate or resize this wall
+            </button>
+          )}
           <button
             className="btn btn-ghost btn-block"
             onClick={() => {
@@ -149,8 +168,10 @@ function ArtworkInspector({ building, id }: { building: Building; id: string }) 
   const owner = useEditor((s) => s.access === 'owner');
   const commit = useEditor((s) => s.commit);
   const select = useEditor((s) => s.select);
+  const layout = useEditor((s) => s.layout);
   if (!art) return <Overview building={building} />;
-  const surface = building.surfaceById.get(art.surfaceId)!;
+  const surface = getSurface(building, layout, art.surfaceId);
+  if (!surface) return <Overview building={building} />;
 
   /** Apply a change only if the artwork still fits on its wall. */
   const update = (patch: Partial<Artwork>) => {
@@ -295,13 +316,14 @@ function Overview({ building }: { building: Building }) {
         <p className="muted small">
           {building.spec.rooms.length} rooms · {building.spec.ceilingHeight} m ceilings · {layout.artworks.length} works hung
         </p>
+        {building.spec.source && <p className="muted small">{building.spec.source}</p>}
       </section>
       <section className="panel-section">
         <div className="label">Rooms & lighting</div>
         <ul className="room-list">
           {building.spec.rooms.map((r) => {
             const on = layout.rooms[r.id]?.lightsOn ?? true;
-            const works = layout.artworks.filter((a) => building.surfaceById.get(a.surfaceId)?.roomId === r.id).length;
+            const works = layout.artworks.filter((a) => getSurface(building, layout, a.surfaceId)?.roomId === r.id).length;
             return (
               <li key={r.id}>
                 <button
@@ -311,7 +333,7 @@ function Overview({ building }: { building: Building }) {
                 >
                   <strong>{r.name}</strong>
                   <span>
-                    {(r.rect.x1 - r.rect.x0).toFixed(0)} × {(r.rect.z1 - r.rect.z0).toFixed(0)} m · {works} works
+                    {metres(r.rect.x1 - r.rect.x0)} × {metres(r.rect.z1 - r.rect.z0)} m · {works} works
                   </span>
                 </button>
                 <button
@@ -359,7 +381,7 @@ function NotesList({ building }: { building: Building }) {
       <ul className="note-list">
         {sorted.map((n) => {
           const pos = resolveAnchor(n.anchor, layout);
-          const s = building.surfaceById.get(pos.surfaceId);
+          const s = getSurface(building, layout, pos.surfaceId);
           return (
             <li key={n.id}>
               <span className={`note-pin note-pin-sm ${n.authorId === layout.ownerId ? 'is-owner' : ''}`}>{initials(n.authorName)}</span>
@@ -466,4 +488,9 @@ function CommitInput(props: {
       onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
     />
   );
+}
+
+/** 13.6 -> "13.6", 15 -> "15". */
+function metres(n: number): string {
+  return n.toFixed(1).replace(/\.0$/, "");
 }

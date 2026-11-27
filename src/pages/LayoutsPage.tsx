@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useAuth, useUser } from '@/auth/AuthProvider';
+import { DEFAULT_BUILDING_ID, getBuilding } from '@/domain/building';
 import type { LayoutSummary } from '@/domain/types';
 import { initials, timeAgo } from '@/lib/format';
 import { navigate } from '@/lib/router';
@@ -8,6 +9,8 @@ import { Icon } from '@/ui/Icon';
 import { Modal } from '@/ui/Modal';
 import { errorMessage, toast } from '@/ui/toast';
 import { useAssetUrl } from '@/ui/useAssetUrl';
+
+const DEFAULT_BUILDING = getBuilding(DEFAULT_BUILDING_ID);
 
 export function LayoutsPage() {
   const user = useUser();
@@ -69,7 +72,10 @@ export function LayoutsPage() {
         <div className="dash-title-row">
           <div>
             <h1>Your layouts</h1>
-            <p className="muted">Each layout is a hang plan for the Practice Gallery — four 15 × 8 m rooms.</p>
+            <p className="muted">
+              New layouts use {DEFAULT_BUILDING.spec.name}:{' '}
+              {DEFAULT_BUILDING.spec.rooms.map((r) => r.name).join(', ')}.
+            </p>
           </div>
           <button className="btn btn-primary" onClick={() => setCreating(true)}>
             <Icon name="plus" /> New layout

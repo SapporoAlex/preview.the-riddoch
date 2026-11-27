@@ -27,6 +27,9 @@ const PATHS = {
   link: 'M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7',
   check: 'M20 6 9 17l-5-5',
   person: 'M12 6a2 2 0 1 0 0-4 2 2 0 0 0 0 4M9 22v-7H7.5V10a2 2 0 0 1 2-2h5a2 2 0 0 1 2 2v5H15v7M12 15v7',
+  partition: 'M9 3h6v18H9zM3 21h18M5 9l4 0M15 15l4 0',
+  cube3d: 'M12 3l8 4.5v9L12 21l-8-4.5v-9zM12 12l8-4.5M12 12v9M12 12L4 7.5',
+  rotate: 'M21 12a9 9 0 1 1-2.6-6.4M21 4v5h-5',
   wall: 'M3 3h18v18H3zM3 9h18M3 15h18M9 3v6M15 9v6M9 15v6',
 } as const;
 

@@ -1,7 +1,8 @@
 import { useFrame, useThree } from '@react-three/fiber';
 import { useEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
-import type { Building, Rect } from '@/domain/building';
+import { floorAt, isBlocked, MAX_STEP, type Building, type Rect } from '@/domain/building';
+import { layoutObstacles } from '@/domain/world';
 import { useEditor } from '../store';
 import { axis, useHeldKeys } from './keys';
 import { isVisibleInScene, sceneRefs } from './sceneRefs';
@@ -45,15 +46,21 @@ export function VisitCamera({ building }: { building: Building }) {
   /** Last cursor x as a fraction of the viewport width, or null when outside it. */
   const cursorX = useRef<number | null>(null);
 
-  const colliders = useMemo<Rect[]>(
-    () => building.pieces.filter((p) => p.y0 < EYE_HEIGHT + 0.2).map((p) => p.rect),
-    [building],
-  );
+  /** Height of the floor under the visitor (changes on stairs and the stage). */
+  const floorY = useRef(0);
 
-  const blocked = (x: number, z: number) =>
-    colliders.some(
-      (c) => x > c.x0 - BODY_RADIUS && x < c.x1 + BODY_RADIUS && z > c.z0 - BODY_RADIUS && z < c.z1 + BODY_RADIUS,
-    );
+  /**
+   * Can the visitor move to (x, z)? Not into walls, doors, columns, movable walls or
+   * plinths, not outside the rooms, and not up or down more than one step at a time
+   * (so stairs work but the stage edge doesn't).
+   */
+  const canStand = (x: number, z: number) => {
+    const y = floorAt(building, x, z);
+    if (y === null || Math.abs(y - floorY.current) > MAX_STEP) return null;
+    const obstacles = layoutObstacles(useEditor.getState().layout);
+    if (isBlocked(building, x, z, BODY_RADIUS, y, EYE_HEIGHT + 0.2, obstacles)) return null;
+    return y;
+  };
 
   // Enter the building: start in the room nearest to where the design camera was looking.
   useEffect(() => {
@@ -71,11 +78,25 @@ export function VisitCamera({ building }: { building: Building }) {
         return Math.hypot(cx - target[0], cz - target[2]) < Math.hypot(bx - target[0], bz - target[2]) ? r : best;
       });
     const m = 1.2;
-    camera.position.set(
-      THREE.MathUtils.clamp(target[0], room.rect.x0 + m, room.rect.x1 - m),
-      EYE_HEIGHT,
-      THREE.MathUtils.clamp(target[2], room.rect.z0 + m, room.rect.z1 - m),
-    );
+    let sx = THREE.MathUtils.clamp(target[0], room.rect.x0 + m, room.rect.x1 - m);
+    let sz = THREE.MathUtils.clamp(target[2], room.rect.z0 + m, room.rect.z1 - m);
+    // Don't start inside a column, stair, movable wall or plinth: spiral out to a clear spot.
+    const obstacles = layoutObstacles(useEditor.getState().layout);
+    const clear = (x: number, z: number) => {
+      const y = floorAt(building, x, z);
+      return y !== null && Math.abs(y - (room.floor ?? 0)) < 0.01 && !isBlocked(building, x, z, BODY_RADIUS, y, EYE_HEIGHT, obstacles);
+    };
+    outer: for (let r = 0; r < 6 && !clear(sx, sz); r += 0.5) {
+      for (let a = 0; a < Math.PI * 2; a += Math.PI / 8) {
+        if (clear(sx + Math.cos(a) * r, sz + Math.sin(a) * r)) {
+          sx += Math.cos(a) * r;
+          sz += Math.sin(a) * r;
+          break outer;
+        }
+      }
+    }
+    floorY.current = floorAt(building, sx, sz) ?? 0;
+    camera.position.set(sx, floorY.current + EYE_HEIGHT, sz);
     dir.y = 0;
     if (dir.lengthSq() < 1e-4) dir.set(0, 0, -1);
     // Camera looks down -Z at yaw 0.
@@ -200,27 +221,41 @@ export function VisitCamera({ building }: { building: Building }) {
     const v = velocity.current;
     const nx = camera.position.x + v.x * dt;
     const nz = camera.position.z + v.z * dt;
-    if (!blocked(nx, camera.position.z)) camera.position.x = nx;
-    else v.x = 0;
-    if (!blocked(camera.position.x, nz)) camera.position.z = nz;
-    else v.z = 0;
-    camera.position.y = EYE_HEIGHT;
+    // Try each axis separately so the visitor slides along walls instead of sticking.
+    const yx = canStand(nx, camera.position.z);
+    if (yx !== null) {
+      camera.position.x = nx;
+      floorY.current = yx;
+    } else v.x = 0;
+    const yz = canStand(camera.position.x, nz);
+    if (yz !== null) {
+      camera.position.z = nz;
+      floorY.current = yz;
+    } else v.z = 0;
+    // Ease the eye height towards the floor so stairs feel smooth rather than jumpy.
+    const targetY = floorY.current + EYE_HEIGHT;
+    camera.position.y += (targetY - camera.position.y) * (1 - Math.pow(0.0001, dt));
 
     // Identify the artwork in front of the visitor (throttled).
     if (state.clock.elapsedTime - lastProbe.current > 0.15) {
       lastProbe.current = state.clock.elapsedTime;
       raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
       raycaster.far = 7;
-      const targets: THREE.Object3D[] = [...sceneRefs.artworks.values()];
+      const targets: THREE.Object3D[] = [...sceneRefs.artworks.values(), ...sceneRefs.objects.values()];
       if (sceneRefs.walls.current) targets.push(sceneRefs.walls.current);
       const hit = raycaster.intersectObjects(targets, true).find((h) => isVisibleInScene(h.object));
       let label: string | null = null;
       if (hit) {
         let o: THREE.Object3D | null = hit.object;
         while (o && !o.userData.kind) o = o.parent;
+        const layout = useEditor.getState().layout;
         if (o?.userData.kind === 'artwork') {
-          const a = useEditor.getState().layout?.artworks.find((x) => x.id === o!.userData.artworkId);
+          const a = layout?.artworks.find((x) => x.id === o!.userData.artworkId);
           if (a) label = `${a.title || 'Untitled'} — ${a.widthCm} × ${a.heightCm} cm`;
+        }
+        if (o?.userData.kind === 'object') {
+          const ob = layout?.objects?.find((x) => x.id === o!.userData.objectId);
+          if (ob) label = `${ob.title || 'Untitled'} — ${ob.heightCm} cm tall`;
         }
       }
       useEditor.getState().setVisitFocusLabel(label);
