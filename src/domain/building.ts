@@ -614,6 +614,24 @@ function sillTops(b: Building): { rect: Rect; y: number }[] {
   return b.pieces.filter((p) => p.isSill).map((p) => ({ rect: p.rect, y: p.y1 }));
 }
 
+function passageFloors(b: Building): Rect[] {
+  let cached = passageCache.get(b);
+  if (!cached) {
+    cached = [];
+    for (const w of b.spec.walls) {
+      for (const o of w.openings) {
+        if (o.kind !== 'passage' || (o.sill ?? 0) > EPS) continue;
+        const s = o.center - o.width / 2;
+        const e = o.center + o.width / 2;
+        cached.push(w.axis === 'x' ? { ...w.rect, x0: s, x1: e } : { ...w.rect, z0: s, z1: e });
+      }
+    }
+    passageCache.set(b, cached);
+  }
+  return cached;
+}
+const passageCache = new WeakMap<Building, Rect[]>();
+
 /**
  * Height of the floor a visitor would stand on at (x, z): room floors, stage
  * edges, stair flights and landings. Null outside the building's rooms.
@@ -623,6 +641,9 @@ export function floorAt(b: Building, x: number, z: number): number | null {
   const take = (y: number) => (best = best === null ? y : Math.max(best, y));
   for (const r of b.spec.rooms) if (inRect(r.rect, x, z)) take(r.floor ?? 0);
   for (const s of sillTops(b)) if (inRect(s.rect, x, z)) take(s.y);
+  // Open passages through a wall's thickness (e.g. the partition between two galleries) are walkable
+  // at floor level; otherwise the wall's own footprint reads as "outside the building".
+  for (const r of passageFloors(b)) if (inRect(r, x, z)) take(0);
   for (const f of b.spec.fixtures ?? []) {
     if (f.kind === 'column' || !insideFootprint(f, x, z)) continue;
     if (f.kind === 'landing') take(f.to ?? 0);

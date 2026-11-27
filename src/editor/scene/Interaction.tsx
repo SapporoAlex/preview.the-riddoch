@@ -136,7 +136,7 @@ export function Interaction({ building }: { building: Building }) {
       const owner = access === 'owner';
       let c = 'default';
       if (drag) c = 'grabbing';
-      else if (tool === 'select' && owner && (hit.kind === 'artwork' || hit.kind === 'partition' || hit.kind === 'object')) c = 'grab';
+      else if (tool === 'select' && owner && (hit.kind === 'artwork' || hit.kind === 'partition' || hit.kind === 'object' || partitionOf(hit))) c = 'grab';
       else if (tool === 'select' && hit.kind !== 'none' && hit.kind !== 'floor') c = 'pointer';
       else if (tool === 'walls') c = partitionOf(hit) ? 'grab' : hit.kind === 'floor' ? 'copy' : 'default';
       else if (tool === 'paint' && hit.kind !== 'none' && hit.kind !== 'floor') c = 'cell';
@@ -145,13 +145,13 @@ export function Interaction({ building }: { building: Building }) {
       el.style.cursor = c;
     };
 
-    const startFloorDrag = (kind: 'partition' | 'object', id: string, e: PointerEvent) => {
+    const startFloorDrag = (kind: 'partition' | 'object', id: string, e: PointerEvent, deferSelect = false) => {
       const item = kind === 'partition' ? partitionById(id) : objectById(id);
       if (!item) return;
       setRay(e);
       const f = floorHit();
       drag = { kind, id, offX: f ? f.x - item.x : 0, offZ: f ? f.z - item.z : 0, moved: false };
-      store().select({ kind, id });
+      if (!deferSelect) store().select({ kind, id });
       if (sceneRefs.controls) sceneRefs.controls.enabled = false;
     };
 
@@ -181,6 +181,9 @@ export function Interaction({ building }: { building: Building }) {
         }
       } else if (tool === 'select' && hit.kind === 'partition') {
         startFloorDrag('partition', hit.partitionId, e);
+      } else if (tool === 'select' && hit.kind === 'surface' && partitionOf(hit)) {
+        // A movable wall's painted face: dragging moves the wall, a plain click still selects the face.
+        startFloorDrag('partition', partitionOf(hit)!, e, true);
       } else if (tool === 'select' && hit.kind === 'object') {
         startFloorDrag('object', hit.objectId, e);
       } else if (tool === 'walls') {
@@ -265,13 +268,23 @@ export function Interaction({ building }: { building: Building }) {
       const x = snap(f.x - d.offX);
       const z = snap(f.z - d.offZ);
       const others = othersExcept(d.id);
+      let nx = x;
+      let nz = z;
       if (d.kind === 'partition') {
         const p = partitionById(d.id);
-        if (!p || (p.x === x && p.z === z)) return;
-        const moved = { ...p, x, z };
-        if (!footprintFits(building, partitionFootprint(moved), others)) return;
-        const floor = floorAt(building, x, z) ?? 0;
-        if (floor + p.heightM > building.spec.ceilingHeight + 1e-6) return;
+        if (!p) return;
+        // If the exact spot is blocked, slide along one axis so the wall glides along obstacles.
+        const spot = [
+          [x, z],
+          [x, p.z],
+          [p.x, z],
+        ].find(([cx, cz]) => {
+          if (!footprintFits(building, partitionFootprint({ ...p, x: cx!, z: cz! }), others)) return false;
+          return (floorAt(building, cx!, cz!) ?? 0) + p.heightM <= building.spec.ceilingHeight + 1e-6;
+        });
+        if (!spot || (p.x === spot[0] && p.z === spot[1])) return;
+        nx = spot[0]!;
+        nz = spot[1]!;
       } else {
         const o = objectById(d.id);
         if (!o || (o.x === x && o.z === z)) return;
@@ -281,11 +294,12 @@ export function Interaction({ building }: { building: Building }) {
       if (!d.moved) {
         d.moved = true;
         st.checkpoint();
+        st.select({ kind: d.kind, id: d.id });
       }
       st.mutate((l) => {
         const list = d.kind === 'partition' ? l.partitions : l.objects;
         const item = list?.find((i) => i.id === d.id);
-        if (item) Object.assign(item, { x, z });
+        if (item) Object.assign(item, { x: nx, z: nz });
       });
     };
 

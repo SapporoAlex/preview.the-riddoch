@@ -255,6 +255,11 @@ function Partitions({ building }: { building: BuildingModel }) {
 const PartitionMesh = memo(function PartitionMesh({ building, partition: p }: { building: BuildingModel; partition: Partition }) {
   const selected = useEditor((s) => s.mode === 'design' && s.selection?.kind === 'partition' && s.selection.id === p.id);
   const [a, b] = partitionSurfaces(building, p);
+  const outline = useMemo(
+    () => new THREE.EdgesGeometry(new THREE.BoxGeometry(p.lengthM + 0.06, p.heightM + 0.06, PARTITION_THICKNESS + 0.06)),
+    [p.lengthM, p.heightM],
+  );
+  useEffect(() => () => outline.dispose(), [outline]);
   return (
     <>
       <group position={[p.x, a.floorY, p.z]} rotation={[0, p.rotation, 0]}>
@@ -266,10 +271,17 @@ const PartitionMesh = memo(function PartitionMesh({ building, partition: p }: { 
           <boxGeometry args={[p.lengthM, p.heightM, PARTITION_THICKNESS]} />
         </mesh>
         {selected && (
-          <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.01, 0]}>
-            <planeGeometry args={[p.lengthM + 0.2, PARTITION_THICKNESS + 0.2]} />
-            <meshBasicMaterial color="#3d6bff" transparent opacity={0.35} toneMapped={false} />
-          </mesh>
+          <>
+            {/* The painted faces cover the body, so outline it and mark its footprint on the floor. */}
+            <lineSegments position={[0, p.heightM / 2, 0]} renderOrder={10}>
+              <primitive object={outline} attach="geometry" />
+              <lineBasicMaterial color="#3d6bff" toneMapped={false} depthTest={false} transparent opacity={0.95} />
+            </lineSegments>
+            <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.01, 0]}>
+              <planeGeometry args={[p.lengthM + 0.5, PARTITION_THICKNESS + 0.5]} />
+              <meshBasicMaterial color="#3d6bff" transparent opacity={0.45} toneMapped={false} depthWrite={false} />
+            </mesh>
+          </>
         )}
       </group>
       <SurfaceMesh surface={a} />
@@ -375,7 +387,7 @@ const SurfaceMesh = memo(function SurfaceMesh({ surface }: { surface: Surface })
 // Floors and ceiling
 // ---------------------------------------------------------------------------
 
-function useWoodMaterial(w: number, d: number) {
+function useWoodMaterial(w: number, d: number, raised = false) {
   return useMemo(() => {
     const t = getFloorTextures();
     const map = t.map.clone();
@@ -384,8 +396,15 @@ function useWoodMaterial(w: number, d: number) {
       tex.repeat.set(w / FLOOR_TILE_M, d / FLOOR_TILE_M);
       tex.needsUpdate = true;
     }
-    return new THREE.MeshStandardMaterial({ map, roughnessMap: rough, roughness: 0.62, metalness: 0.02 });
-  }, [w, d]);
+    return new THREE.MeshStandardMaterial({
+      map,
+      roughnessMap: rough,
+      roughness: 0.62,
+      metalness: 0.02,
+      // Raised timber sits a hair above a solid top face; bias it so the two never z-fight.
+      ...(raised ? { polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 } : {}),
+    });
+  }, [w, d, raised]);
 }
 
 function Floor({ building }: { building: BuildingModel }) {
@@ -433,14 +452,14 @@ function RaisedFloors({ building }: { building: BuildingModel }) {
 function RaisedFloor({ rect, y, platform }: { rect: Rect; y: number; platform: boolean }) {
   const w = rect.x1 - rect.x0;
   const d = rect.z1 - rect.z0;
-  const wood = useWoodMaterial(w, d);
+  const wood = useWoodMaterial(w, d, true);
   const cx = (rect.x0 + rect.x1) / 2;
   const cz = (rect.z0 + rect.z1) / 2;
   return (
     <>
       {platform && (
-        <mesh material={structureMaterial} position={[cx, y / 2, cz]}>
-          <boxGeometry args={[w, y - 0.002, d]} />
+        <mesh material={structureMaterial} position={[cx, (y - 0.02) / 2 + 0.001, cz]}>
+          <boxGeometry args={[w, y - 0.02, d]} />
         </mesh>
       )}
       <mesh material={wood} rotation={[-Math.PI / 2, 0, 0]} position={[cx, y + 0.001, cz]} userData={{ kind: 'floor' }}>

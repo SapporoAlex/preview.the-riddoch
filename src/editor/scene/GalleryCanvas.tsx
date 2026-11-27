@@ -20,7 +20,7 @@ export function GalleryCanvas({ building }: { building: BuildingModel }) {
     <Canvas
       className="gallery-canvas"
       dpr={[1, 2]}
-      camera={{ position: [6, 26, 30], fov: 50, near: 0.05, far: 400 }}
+      camera={{ position: [6, 26, 30], fov: 50, near: 0.1, far: 400 }}
       gl={{ antialias: true, powerPreference: 'high-performance' }}
       onCreated={({ gl }) => {
         gl.toneMapping = THREE.ACESFilmicToneMapping;
