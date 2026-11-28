@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useUser } from '@/auth/AuthProvider';
-import { prepareImage, type PreparedImage } from '@/lib/image';
+import { fileBaseName, prepareImage, type PreparedImage } from '@/lib/image';
 import { useServices } from '@/services';
 import { Icon } from '@/ui/Icon';
 import { Modal } from '@/ui/Modal';
@@ -25,6 +25,7 @@ export function ObjectUploadDialog({ onClose, onSwitch }: { onClose(): void; onS
   const [preview, setPreview] = useState<string | null>(null);
   const [hasAlpha, setHasAlpha] = useState(false);
   const [title, setTitle] = useState('');
+  const [fileName, setFileName] = useState('');
   const [height, setHeight] = useState('');
   const [plinth, setPlinth] = useState(String(DEFAULT_PLINTH_CM));
   const [error, setError] = useState<string | null>(null);
@@ -42,7 +43,9 @@ export function ObjectUploadDialog({ onClose, onSwitch }: { onClose(): void; onS
       setImage(img);
       setPreview(URL.createObjectURL(img.blob));
       setHasAlpha(img.mimeType === 'image/png' && (await hasTransparency(img.blob)));
-      setTitle(file.name.replace(/\.(png|jpe?g)$/i, '').replace(/[_-]+/g, ' ').trim());
+      const base = fileBaseName(file.name);
+      setFileName(base);
+      setTitle(base);
     } catch (err) {
       setImage(null);
       setError(errorMessage(err));
@@ -72,7 +75,7 @@ export function ObjectUploadDialog({ onClose, onSwitch }: { onClose(): void; onS
       const asset = await assets.put(user.id, image.blob, { width: image.width, height: image.height });
       const url = await assets.getUrl(asset.id);
       if (url) setAssetUrl(asset.id, url);
-      setPendingObject({ assetId: asset.id, title: title.trim() || 'Untitled object', heightCm: h, widthCm, plinthHeightCm: p });
+      setPendingObject({ assetId: asset.id, title: title.trim() || fileName || 'Untitled object', heightCm: h, widthCm, plinthHeightCm: p });
       toast('Now click the floor to place it');
       onClose();
     } catch (e) {
@@ -135,8 +138,9 @@ export function ObjectUploadDialog({ onClose, onSwitch }: { onClose(): void; onS
           </div>
           <div className="upload-fields">
             <label className="field">
-              <span>Title</span>
-              <input value={title} onChange={(e) => setTitle(e.target.value)} maxLength={120} placeholder="Untitled object" />
+              <span>Name</span>
+              <input value={title} onChange={(e) => setTitle(e.target.value)} maxLength={120} placeholder={fileName || 'Untitled object'} />
+              <span className="field-hint">From the file name. Change it here, or later in the panel on the right.</span>
             </label>
             <div className="label">
               Real-world size <span className="req">required</span>

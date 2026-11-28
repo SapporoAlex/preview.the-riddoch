@@ -1929,3 +1929,8 @@ textarea:focus {
     gap: 4px;
   }
 }
+.field-hint {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--text-3);
+}

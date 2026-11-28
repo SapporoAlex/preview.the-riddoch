@@ -77,3 +77,9 @@ export function dataUrlToBlob(dataUrl: string): Blob {
   for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
   return new Blob([bytes], { type: mime });
 }
+
+/** A file's name without its extension: the default name for an uploaded work ("Smith_Untitled-2.jpg" → "Smith_Untitled-2"). */
+export function fileBaseName(fileName: string): string {
+  const base = fileName.replace(/\.[a-z0-9]{2,5}$/i, '').trim();
+  return (base || fileName).slice(0, 120);
+}

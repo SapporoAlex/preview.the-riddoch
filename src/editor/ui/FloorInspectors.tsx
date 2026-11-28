@@ -128,7 +128,7 @@ export function ObjectInspector({ building, id }: { building: Building; id: stri
         </div>
       )}
       <label className="field">
-        <span>Title</span>
+        <span>Name</span>
         <TextInput value={o.title} disabled={!owner} onCommit={(title) => updateObject(building, id, { title })} />
       </label>
       <div className="row-2">

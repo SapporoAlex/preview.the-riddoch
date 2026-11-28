@@ -237,7 +237,7 @@ function ArtworkInspector({ building, id }: { building: Building; id: string }) 
         </label>
       )}
       <label className="field">
-        <span>Title</span>
+        <span>Name</span>
         <CommitInput
           value={art.title}
           disabled={!owner}

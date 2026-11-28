@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useUser } from '@/auth/AuthProvider';
 import type { FrameStyle } from '@/domain/types';
-import { prepareImage, type PreparedImage } from '@/lib/image';
+import { fileBaseName, prepareImage, type PreparedImage } from '@/lib/image';
 import { useServices } from '@/services';
 import { Icon } from '@/ui/Icon';
 import { Modal } from '@/ui/Modal';
@@ -24,6 +24,8 @@ export function UploadDialog({ onClose }: { onClose(): void }) {
   const [image, setImage] = useState<PreparedImage | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [title, setTitle] = useState('');
+  /** The uploaded file's name (no extension): the default, and the fallback if the name is cleared. */
+  const [fileName, setFileName] = useState('');
   const [text, setText] = useState('Artwork to come');
   const [width, setWidth] = useState('');
   const [height, setHeight] = useState('');
@@ -62,7 +64,9 @@ export function UploadDialog({ onClose }: { onClose(): void }) {
       const img = await prepareImage(file);
       setImage(img);
       setPreview(URL.createObjectURL(img.blob));
-      setTitle(file.name.replace(/\.(png|jpe?g)$/i, '').replace(/[_-]+/g, ' ').trim());
+      const base = fileBaseName(file.name);
+      setFileName(base);
+      setTitle(base);
       setWidth('');
       setHeight('');
     } catch (err) {
@@ -118,7 +122,7 @@ export function UploadDialog({ onClose }: { onClose(): void }) {
       const asset = await assets.put(user.id, image.blob, { width: image.width, height: image.height });
       const url = await assets.getUrl(asset.id);
       if (url) setAssetUrl(asset.id, url);
-      setPending({ assetId: asset.id, title: title.trim() || 'Untitled', widthCm: w, heightCm: h, frame });
+      setPending({ assetId: asset.id, title: title.trim() || fileName || 'Untitled', widthCm: w, heightCm: h, frame });
       toast('Now click a wall to hang it');
       onClose();
     } catch (err) {
@@ -225,7 +229,7 @@ export function UploadDialog({ onClose }: { onClose(): void }) {
               />
             </label>
             <label className="field">
-              <span>Title (optional)</span>
+              <span>Name (optional)</span>
               <input value={title} onChange={(e) => setTitle(e.target.value)} maxLength={120} placeholder="Placeholder" />
             </label>
             {sizeFields}
@@ -267,8 +271,9 @@ export function UploadDialog({ onClose }: { onClose(): void }) {
           </div>
           <div className="upload-fields">
             <label className="field">
-              <span>Title</span>
-              <input value={title} onChange={(e) => setTitle(e.target.value)} maxLength={120} placeholder="Untitled" />
+              <span>Name</span>
+              <input value={title} onChange={(e) => setTitle(e.target.value)} maxLength={120} placeholder={fileName || 'Untitled'} />
+              <span className="field-hint">From the file name. Change it here, or later in the panel on the right.</span>
             </label>
             {sizeFields}
             {frameField}
