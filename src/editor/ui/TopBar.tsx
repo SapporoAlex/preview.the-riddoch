@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useUser } from '@/auth/AuthProvider';
 import { FUTURE_SHARING } from '@/lib/features';
 import { useServices } from '@/services';
@@ -35,8 +35,7 @@ export function TopBar({
   const setShowFigures = useEditor((s) => s.setShowFigures);
   const phone = useEditor((s) => s.phoneView);
   const owner = access === 'owner';
-  /** Phones are view-only even for the owner. */
-  const canEdit = owner && !phone;
+  const canEdit = owner;
   const [editingName, setEditingName] = useState(false);
   const [name, setName] = useState(layout.name);
 
@@ -117,6 +116,39 @@ export function TopBar({
         </div>
       </div>
 
+      {phone ? (
+        <div className="topbar-right">
+          <MoreMenu>
+            <button className="menu-item" onClick={() => setShowFigures(!showFigures)} aria-pressed={showFigures}>
+              <Icon name="person" size={16} /> 6 ft figures <span className="menu-state">{showFigures ? 'On' : 'Off'}</span>
+            </button>
+            {mode === 'design' && (
+              <button className="menu-item" onClick={() => setCutaway(!cutaway)} aria-pressed={cutaway}>
+                <Icon name="wall" size={16} /> Walls <span className="menu-state">{cutaway ? 'Cutaway' : 'Up'}</span>
+              </button>
+            )}
+            <button className="menu-item" onClick={onExport}>
+              <Icon name="download" size={16} /> Download PDF
+            </button>
+            {canEdit &&
+              (features.sharing ? (
+                <button className="menu-item" onClick={onShare}>
+                  <Icon name="share" size={16} /> Share
+                </button>
+              ) : (
+                <div className="menu-item menu-item-disabled">
+                  <Icon name="share" size={16} /> Share
+                  <span className="menu-note">{FUTURE_SHARING}</span>
+                </div>
+              ))}
+          </MoreMenu>
+          {canEdit && (
+            <button className="btn btn-primary btn-save-phone" onClick={onSave} disabled={saving || !dirty} aria-label="Save">
+              <Icon name="save" size={18} />
+            </button>
+          )}
+        </div>
+      ) : (
       <div className="topbar-right">
         <button
           className={`btn btn-ghost btn-sm ${showFigures ? 'is-on' : ''}`}
@@ -126,7 +158,7 @@ export function TopBar({
         >
           <Icon name="person" size={16} /> <span className="btn-label">{showFigures ? 'Figures: on' : 'Figures: off'}</span>
         </button>
-        {mode === 'design' && !phone && (
+        {mode === 'design' && (
           <button
             className={`btn btn-ghost btn-sm ${cutaway ? 'is-on' : ''}`}
             onClick={() => setCutaway(!cutaway)}
@@ -166,6 +198,31 @@ export function TopBar({
           </>
         )}
       </div>
+      )}
     </header>
+  );
+}
+
+/** Phone top bar: the less-used controls live behind a "more" button. */
+function MoreMenu({ children }: { children: React.ReactNode }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const close = (e: PointerEvent) => !ref.current?.contains(e.target as Node) && setOpen(false);
+    window.addEventListener('pointerdown', close);
+    return () => window.removeEventListener('pointerdown', close);
+  }, [open]);
+  return (
+    <div className="more-menu" ref={ref}>
+      <button className={`icon-btn ${open ? 'is-on' : ''}`} onClick={() => setOpen(!open)} aria-expanded={open} aria-label="More">
+        <Icon name="more" />
+      </button>
+      {open && (
+        <div className="menu-pop" role="menu" onClick={(e) => (e.target as HTMLElement).closest('button') && setOpen(false)}>
+          {children}
+        </div>
+      )}
+    </div>
   );
 }

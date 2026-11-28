@@ -33,11 +33,7 @@ export default function EditorPage({ layoutId }: { layoutId: string }) {
   const access = useEditor((s) => s.access);
   const mode = useEditor((s) => s.mode);
   const phone = usePhone();
-  useEffect(() => {
-    useEditor.getState().setPhoneView(phone);
-    // Phones only look around: leave any editing tool.
-    if (phone) useEditor.getState().setTool('select');
-  }, [phone]);
+  useEffect(() => useEditor.getState().setPhoneView(phone), [phone]);
   const building = useMemo(() => (layout ? getBuilding(layout.buildingId) : null), [layout?.buildingId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ---- Load layout, access, notes and image URLs ----
@@ -285,23 +281,18 @@ export default function EditorPage({ layoutId }: { layoutId: string }) {
     <div className={`editor mode-${mode}`}>
       <TopBar onBack={leave} onSave={save} onShare={() => setShareOpen(true)} onExport={exportPdf} />
       <div className="editor-body">
-        {mode === 'design' && !phone && <ToolRail onUpload={() => setUploadOpen(true)} />}
+        {mode === 'design' && <ToolRail onUpload={() => setUploadOpen(true)} />}
         <div className="viewport">
           <GalleryCanvas building={building} />
-          {mode === 'design' && !phone && <HintBar />}
+          {mode === 'design' && <HintBar />}
           {mode === 'visit' && <VisitOverlay />}
-          {phone && mode === 'design' && (
-            <div className="viewer-banner phone-banner">
-              <Icon name="eye" size={15} /> Phone view: look around or tap Visit. Edit on a tablet or computer.
-            </div>
-          )}
-          {access === 'viewer' && !phone && mode === 'design' && (
+          {access === 'viewer' && mode === 'design' && (
             <div className="viewer-banner">
               <Icon name="eye" size={15} /> View only — you can look around and leave notes.
             </div>
           )}
         </div>
-        {mode === 'design' && !phone && <SidePanel building={building} />}
+        {mode === 'design' && <SidePanel building={building} />}
       </div>
       {uploadOpen && <UploadDialog onClose={() => setUploadOpen(false)} />}
       {shareOpen && <ShareDialog layout={layout} onClose={() => setShareOpen(false)} />}

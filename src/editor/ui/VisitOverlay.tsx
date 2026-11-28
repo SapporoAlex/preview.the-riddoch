@@ -10,7 +10,6 @@ export function VisitOverlay() {
   const label = useEditor((s) => s.visitFocusLabel);
   const setMode = useEditor((s) => s.setMode);
   const touch = useTouch();
-  const phone = useEditor((s) => s.phoneView);
 
   if (!walking) {
     return (
@@ -35,7 +34,7 @@ export function VisitOverlay() {
               Start walking
             </button>
             <button className="btn btn-ghost btn-lg" onClick={() => setMode('design')}>
-              <Icon name="cube" size={16} /> {phone ? 'Back to overview' : 'Back to design view'}
+              <Icon name="cube" size={16} /> Back to design view
             </button>
           </div>
         </div>

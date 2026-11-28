@@ -1,11 +1,11 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useUser } from '@/auth/AuthProvider';
 import { fileBaseName, prepareImage, type PreparedImage } from '@/lib/image';
 import { useServices } from '@/services';
-import { Icon } from '@/ui/Icon';
 import { Modal } from '@/ui/Modal';
 import { errorMessage, toast } from '@/ui/toast';
 import { useEditor } from '../store';
+import { PhotoSource } from './PhotoSource';
 import { KindSwitch, type Kind } from './UploadDialog';
 
 const MAX_OBJECT_CM = 580;
@@ -30,8 +30,6 @@ export function ObjectUploadDialog({ onClose, onSwitch }: { onClose(): void; onS
   const [plinth, setPlinth] = useState(String(DEFAULT_PLINTH_CM));
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [dragOver, setDragOver] = useState(false);
-  const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => () => void (preview && URL.revokeObjectURL(preview)), [preview]);
 
@@ -102,34 +100,17 @@ export function ObjectUploadDialog({ onClose, onSwitch }: { onClose(): void; onS
     >
       <KindSwitch kind="object" onChange={onSwitch} />
       {!image ? (
-        <div
-          className={`dropzone ${dragOver ? 'over' : ''}`}
-          onClick={() => fileRef.current?.click()}
-          onDragOver={(e) => {
-            e.preventDefault();
-            setDragOver(true);
-          }}
-          onDragLeave={() => setDragOver(false)}
-          onDrop={(e) => {
-            e.preventDefault();
-            setDragOver(false);
-            onFile(e.dataTransfer.files[0]);
-          }}
-          role="button"
-          tabIndex={0}
-          onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && fileRef.current?.click()}
-        >
-          <Icon name="cube3d" size={28} />
-          <strong>Drop a photo of the object</strong>
-          <span className="muted small">PNG with a transparent background works best · JPEG also accepted</span>
-        </div>
+        <PhotoSource
+          onFile={onFile}
+          icon="cube3d"
+          title="Drop a photo of the object"
+          hint="PNG with a transparent background works best · JPEG also accepted"
+        />
       ) : (
         <div className="upload-grid">
           <div className="upload-preview art-preview-object">
             {preview && <img src={preview} alt="" />}
-            <button className="btn btn-sm btn-ghost" onClick={() => fileRef.current?.click()}>
-              Choose another
-            </button>
+            <PhotoSource onFile={onFile} compact />
             {!hasAlpha && (
               <span className="muted small">
                 Tip: a cut-out PNG (transparent background) shows only the object, not the photo’s background.
@@ -164,16 +145,6 @@ export function ObjectUploadDialog({ onClose, onSwitch }: { onClose(): void; onS
         </div>
       )}
       {error && <div className="form-error">{error}</div>}
-      <input
-        ref={fileRef}
-        type="file"
-        accept="image/png,image/jpeg"
-        hidden
-        onChange={(e) => {
-          onFile(e.target.files?.[0]);
-          e.target.value = '';
-        }}
-      />
     </Modal>
   );
 }

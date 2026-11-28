@@ -135,8 +135,8 @@ export function Interaction({ building }: { building: Building }) {
     ];
 
     const updateCursor = (hit: Hit) => {
-      const { tool, access, pendingObject, phoneView } = store();
-      const owner = access === 'owner' && !phoneView;
+      const { tool, access, pendingObject } = store();
+      const owner = access === 'owner';
       let c = 'default';
       if (drag) c = 'grabbing';
       else if (tool === 'select' && owner && (hit.kind === 'artwork' || hit.kind === 'partition' || hit.kind === 'object' || partitionOf(hit))) c = 'grab';
@@ -174,8 +174,8 @@ export function Interaction({ building }: { building: Building }) {
       if (touch) hover(e);
       const hit = pick(e);
       down = { x: e.clientX, y: e.clientY, hit, pointerId: e.pointerId, tol: touch ? 12 : CLICK_TOLERANCE_PX };
-      const { tool, access, selection, phoneView } = store();
-      if (access !== 'owner' || phoneView) return;
+      const { tool, access, selection } = store();
+      if (access !== 'owner') return;
       // With a finger, only something already selected can be dragged: a first tap selects it, so
       // dragging across the view to orbit doesn't move the works by accident.
       const isSelected = (kind: string, id: string) => selection?.kind === kind && selection.id === id;

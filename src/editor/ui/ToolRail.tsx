@@ -21,6 +21,11 @@ export function ToolRail({ onUpload }: { onUpload(): void }) {
   const tool = useEditor((s) => s.tool);
   const access = useEditor((s) => s.access);
   const setTool = useEditor((s) => s.setTool);
+  const phone = useEditor((s) => s.phoneView);
+  const canUndo = useEditor((s) => s.past.length > 0);
+  const canRedo = useEditor((s) => s.future.length > 0);
+  const undo = useEditor((s) => s.undo);
+  const redo = useEditor((s) => s.redo);
 
   return (
     <nav className="tool-rail" aria-label="Tools">
@@ -32,6 +37,7 @@ export function ToolRail({ onUpload }: { onUpload(): void }) {
             className={`tool-btn ${active ? 'on' : ''}`}
             onClick={() => (t.id === 'upload' ? onUpload() : setTool(t.id))}
             aria-pressed={active}
+            aria-label={t.label}
           >
             <Icon name={t.icon} size={20} />
             <span className="tool-tip">
@@ -40,6 +46,17 @@ export function ToolRail({ onUpload }: { onUpload(): void }) {
           </button>
         );
       })}
+      {phone && access === 'owner' && (
+        <>
+          <span className="tool-sep" aria-hidden />
+          <button className="tool-btn" disabled={!canUndo} onClick={undo} aria-label="Undo">
+            <Icon name="undo" size={20} />
+          </button>
+          <button className="tool-btn" disabled={!canRedo} onClick={redo} aria-label="Redo">
+            <Icon name="redo" size={20} />
+          </button>
+        </>
+      )}
     </nav>
   );
 }

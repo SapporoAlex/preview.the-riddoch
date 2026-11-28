@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useUser } from '@/auth/AuthProvider';
 import type { FrameStyle } from '@/domain/types';
 import { fileBaseName, prepareImage, type PreparedImage } from '@/lib/image';
@@ -7,6 +7,7 @@ import { Icon } from '@/ui/Icon';
 import { Modal } from '@/ui/Modal';
 import { errorMessage, toast } from '@/ui/toast';
 import { useEditor } from '../store';
+import { PhotoSource } from './PhotoSource';
 import { ObjectUploadDialog } from './ObjectUploadDialog';
 
 const MAX_W_CM = 1500;
@@ -33,8 +34,6 @@ export function UploadDialog({ onClose }: { onClose(): void }) {
   const [frame, setFrame] = useState<FrameStyle>('none');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [dragOver, setDragOver] = useState(false);
-  const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => () => void (preview && URL.revokeObjectURL(preview)), [preview]);
 
@@ -237,34 +236,12 @@ export function UploadDialog({ onClose }: { onClose(): void }) {
           </div>
         </div>
       ) : !image ? (
-        <div
-          className={`dropzone ${dragOver ? 'over' : ''}`}
-          onClick={() => fileRef.current?.click()}
-          onDragOver={(e) => {
-            e.preventDefault();
-            setDragOver(true);
-          }}
-          onDragLeave={() => setDragOver(false)}
-          onDrop={(e) => {
-            e.preventDefault();
-            setDragOver(false);
-            onFile(e.dataTransfer.files[0]);
-          }}
-          role="button"
-          tabIndex={0}
-          onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && fileRef.current?.click()}
-        >
-          <Icon name="upload" size={28} />
-          <strong>Drop a PNG or JPEG here</strong>
-          <span className="muted small">or click to browse · up to 30 MB</span>
-        </div>
+        <PhotoSource onFile={onFile} />
       ) : (
         <div className="upload-grid">
           <div className="upload-preview">
             {preview && <img src={preview} alt="" />}
-            <button className="btn btn-sm btn-ghost" onClick={() => fileRef.current?.click()}>
-              Choose another
-            </button>
+            <PhotoSource onFile={onFile} compact />
             <span className="muted small">
               {image.sourceWidth} × {image.sourceHeight} px
             </span>
@@ -281,16 +258,6 @@ export function UploadDialog({ onClose }: { onClose(): void }) {
         </div>
       )}
       {error && <div className="form-error">{error}</div>}
-      <input
-        ref={fileRef}
-        type="file"
-        accept="image/png,image/jpeg"
-        hidden
-        onChange={(e) => {
-          onFile(e.target.files?.[0]);
-          e.target.value = '';
-        }}
-      />
     </Modal>
   );
 }
