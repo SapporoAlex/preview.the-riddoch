@@ -18,6 +18,16 @@ const MAX_PITCH = THREE.MathUtils.degToRad(80);
 /** Fraction of the viewport width at each side that keeps turning when the cursor rests there (no-lock fallback). */
 const EDGE_ZONE = 0.07;
 const EDGE_TURN_SPEED = 1.6; // rad/s
+/** Radians of turn per pixel of finger drag (touchscreens). */
+const TOUCH_LOOK_SENSITIVITY = 0.0048;
+/** Mouse events browsers synthesise after a tap are ignored for this long. */
+const TOUCH_MOUSE_SUPPRESS_MS = 800;
+
+/**
+ * On-screen joystick input, written by the overlay's thumbstick: x = strafe
+ * (right +), z = forward (+). Length 0–1 sets the walking speed.
+ */
+export const touchWalk = { x: 0, z: 0 };
 
 /**
  * Imperative entry points used by the DOM overlay. Set while VisitCamera is mounted.
@@ -45,6 +55,9 @@ export function VisitCamera({ building }: { building: Building }) {
   const look = useRef({ yaw: 0, pitch: 0 });
   /** Last cursor x as a fraction of the viewport width, or null when outside it. */
   const cursorX = useRef<number | null>(null);
+
+  /** Time of the last touch, to ignore the mouse events a tap also fires. */
+  const lastTouch = useRef(0);
 
   /** Height of the floor under the visitor (changes on stairs and the stage). */
   const floorY = useRef(0);
@@ -122,6 +135,7 @@ export function VisitCamera({ building }: { building: Building }) {
     };
 
     const onMouseMove = (e: MouseEvent) => {
+      if (performance.now() - lastTouch.current < TOUCH_MOUSE_SUPPRESS_MS) return;
       const r = el.getBoundingClientRect();
       const inside = e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom;
       cursorX.current = inside ? (e.clientX - r.left) / r.width : null;
@@ -143,8 +157,13 @@ export function VisitCamera({ building }: { building: Building }) {
       wasLocked = locked;
     };
 
+    const touchFirst = () =>
+      performance.now() - lastTouch.current < 5000 || (window.matchMedia?.('(pointer: coarse)').matches ?? false);
+
     const start = () => {
       st().setVisitLocked(true);
+      // Touchscreens look around by dragging; pointer lock only makes sense with a mouse.
+      if (touchFirst()) return st().setVisitMouseLock(false);
       try {
         const req = el.requestPointerLock() as unknown as Promise<void> | undefined;
         // Newer browsers return a promise that rejects when lock is refused; the free-look fallback covers that.
@@ -165,7 +184,35 @@ export function VisitCamera({ building }: { building: Building }) {
 
     // Clicking the scene while walking re-tries the lock (e.g. after the browser refused a too-early request).
     const onCanvasDown = () => {
+      if (performance.now() - lastTouch.current < TOUCH_MOUSE_SUPPRESS_MS) return;
       if (st().visitLocked && document.pointerLockElement !== el) start();
+    };
+
+    // Touch: drag anywhere on the view to look around (the thumbstick handles walking).
+    let lookFinger: { id: number; x: number; y: number } | null = null;
+    const onTouchDown = (e: PointerEvent) => {
+      if (e.pointerType !== 'touch') return;
+      lastTouch.current = performance.now();
+      cursorX.current = null;
+      if (!st().visitLocked || lookFinger) return;
+      lookFinger = { id: e.pointerId, x: e.clientX, y: e.clientY };
+    };
+    const onTouchMove = (e: PointerEvent) => {
+      if (e.pointerType !== 'touch') return;
+      lastTouch.current = performance.now();
+      if (!lookFinger || e.pointerId !== lookFinger.id || !st().visitLocked) return;
+      const dx = e.clientX - lookFinger.x;
+      const dy = e.clientY - lookFinger.y;
+      lookFinger.x = e.clientX;
+      lookFinger.y = e.clientY;
+      look.current.yaw -= dx * TOUCH_LOOK_SENSITIVITY;
+      look.current.pitch = THREE.MathUtils.clamp(look.current.pitch - dy * TOUCH_LOOK_SENSITIVITY, -MAX_PITCH, MAX_PITCH);
+      applyLook();
+    };
+    const onTouchUp = (e: PointerEvent) => {
+      if (e.pointerType !== 'touch') return;
+      lastTouch.current = performance.now();
+      if (lookFinger?.id === e.pointerId) lookFinger = null;
     };
 
     visitApi.start = start;
@@ -174,6 +221,10 @@ export function VisitCamera({ building }: { building: Building }) {
     document.addEventListener('pointerlockchange', onLockChange);
     window.addEventListener('keydown', onKey);
     el.addEventListener('mousedown', onCanvasDown);
+    el.addEventListener('pointerdown', onTouchDown);
+    window.addEventListener('pointermove', onTouchMove);
+    window.addEventListener('pointerup', onTouchUp);
+    window.addEventListener('pointercancel', onTouchUp);
     return () => {
       visitApi.start = () => {};
       visitApi.stop = () => {};
@@ -181,6 +232,12 @@ export function VisitCamera({ building }: { building: Building }) {
       document.removeEventListener('pointerlockchange', onLockChange);
       window.removeEventListener('keydown', onKey);
       el.removeEventListener('mousedown', onCanvasDown);
+      el.removeEventListener('pointerdown', onTouchDown);
+      window.removeEventListener('pointermove', onTouchMove);
+      window.removeEventListener('pointerup', onTouchUp);
+      window.removeEventListener('pointercancel', onTouchUp);
+      touchWalk.x = 0;
+      touchWalk.z = 0;
       if (document.pointerLockElement === el) document.exitPointerLock();
       st().setVisitLocked(false);
       st().setVisitMouseLock(false);
@@ -215,6 +272,14 @@ export function VisitCamera({ building }: { building: Building }) {
     right.crossVectors(fwd, camera.up).normalize();
     wish.set(0, 0, 0).addScaledVector(fwd, az).addScaledVector(right, ax);
     if (wish.lengthSq() > 0) wish.normalize().multiplyScalar(k.has('ShiftLeft') || k.has('ShiftRight') ? RUN_SPEED : WALK_SPEED);
+    else if (walking) {
+      // Thumbstick: speed follows how far it is pushed.
+      const mag = Math.min(1, Math.hypot(touchWalk.x, touchWalk.z));
+      if (mag > 0.08) {
+        wish.addScaledVector(fwd, touchWalk.z).addScaledVector(right, touchWalk.x);
+        wish.setLength(WALK_SPEED * mag);
+      }
+    }
 
     // Smooth acceleration / deceleration with wall sliding.
     velocity.current.lerp(wish, 1 - Math.pow(0.0005, dt));

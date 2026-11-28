@@ -1750,3 +1750,182 @@ textarea:focus {
     font-size: 11.5px;
   }
 }
+
+/* ---- Touchscreens, tablets and phones ---- */
+
+/* The 3D view handles every touch itself (no page scroll or browser zoom on it). */
+.gallery-canvas,
+.gallery-canvas canvas {
+  touch-action: none;
+}
+
+/* Thumbstick for walking in Visit mode */
+.touch-stick {
+  position: absolute;
+  left: max(22px, env(safe-area-inset-left));
+  bottom: max(26px, env(safe-area-inset-bottom));
+  z-index: 30;
+  width: 128px;
+  height: 128px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.14);
+  border: 1.5px solid rgba(255, 255, 255, 0.45);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.25);
+  backdrop-filter: blur(3px);
+  display: grid;
+  place-items: center;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.touch-stick.active {
+  background: rgba(255, 255, 255, 0.22);
+}
+.touch-stick-knob {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
+  pointer-events: none;
+}
+.visit-keys-touch {
+  left: auto;
+  right: 16px;
+  bottom: 22px;
+  transform: none;
+  font-size: 12px;
+}
+.visit-label-touch {
+  bottom: auto;
+  top: 16px;
+}
+
+/* Tablets / narrow windows: the side panel slides over the 3D view */
+.side-panel-drawer {
+  position: absolute;
+  top: var(--topbar-h);
+  right: 0;
+  bottom: 0;
+  width: min(340px, 86vw);
+  z-index: 40;
+  box-shadow: -12px 0 32px rgba(20, 20, 25, 0.16);
+}
+.panel-tabs {
+  position: relative;
+}
+.panel-close {
+  margin-left: auto;
+  align-self: center;
+}
+.panel-reopen {
+  position: absolute;
+  top: calc(var(--topbar-h) + 12px);
+  right: 12px;
+  z-index: 30;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow);
+}
+.editor {
+  position: relative;
+}
+
+/* Bigger targets for fingers */
+@media (pointer: coarse) {
+  .tool-btn {
+    width: 48px;
+    height: 48px;
+  }
+  .icon-btn {
+    width: 42px;
+    height: 42px;
+  }
+  .tool-tip {
+    display: none;
+  }
+  .hint-keys-touch {
+    display: inline !important;
+  }
+  .segmented button {
+    height: 38px;
+  }
+}
+
+/* Phones: view-only editor */
+@media (max-width: 640px) {
+  .topbar {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    gap: 6px;
+    padding: 0 6px;
+  }
+  .topbar-left {
+    gap: 2px;
+  }
+  .topbar-title .save-state {
+    display: none;
+  }
+  .name-btn {
+    max-width: 32vw;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .topbar-center {
+    justify-self: center;
+  }
+  .seg-extra {
+    display: none;
+  }
+  .segmented button {
+    padding: 0 10px;
+  }
+  .topbar-right {
+    gap: 4px;
+  }
+  .topbar-right .btn-ghost {
+    padding: 0 9px;
+  }
+  .phone-banner {
+    top: auto;
+    bottom: max(14px, env(safe-area-inset-bottom));
+    width: max-content;
+    max-width: calc(100% - 24px);
+    white-space: normal;
+    text-align: center;
+    font-size: 12.5px;
+  }
+  .visit-card {
+    margin: 0 14px;
+    padding: 22px 18px;
+  }
+  .visit-keys-touch {
+    display: none;
+  }
+}
+@media (max-width: 900px) {
+  .seg-extra {
+    display: none;
+  }
+  .segmented button {
+    padding: 0 11px;
+  }
+  .topbar {
+    gap: 8px;
+  }
+  .name-btn {
+    max-width: 22vw;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+@media (max-width: 640px) {
+  .name-btn {
+    max-width: 22vw;
+  }
+  .segmented button {
+    padding: 0 9px;
+    gap: 4px;
+  }
+}

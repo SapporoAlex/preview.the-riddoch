@@ -4,6 +4,7 @@ import { can } from '@/domain/permissions';
 import type { Artwork, FrameStyle } from '@/domain/types';
 import { allSurfaces, getSurface, isPartitionSurfaceId } from '@/domain/world';
 import { DEFAULT_WALL_COLOR, hexToRgb } from '@/lib/color';
+import { useNarrow } from '@/lib/device';
 import { initials, timeAgo } from '@/lib/format';
 import { Icon } from '@/ui/Icon';
 import { toast } from '@/ui/toast';
@@ -18,13 +19,26 @@ export function SidePanel({ building }: { building: Building }) {
   const [tab, setTab] = useState<Tab>('inspect');
   const noteCount = useEditor((s) => s.notes.length);
   const tool = useEditor((s) => s.tool);
+  const narrow = useNarrow();
+  const panelOpen = useEditor((s) => s.panelOpen);
+  const setPanelOpen = useEditor((s) => s.setPanelOpen);
   useEffect(() => {
     if (tool === 'note') setTab('notes');
     if (tool === 'paint') setTab('inspect');
+    // On tablets the panel is a drawer: open it for tools whose settings live here.
+    if (tool === 'paint' || tool === 'walls' || tool === 'note') useEditor.getState().setPanelOpen(true);
   }, [tool]);
 
+  if (narrow && !panelOpen) {
+    return (
+      <button className="btn panel-reopen" onClick={() => setPanelOpen(true)} aria-label="Show details panel">
+        <Icon name="layers" size={16} /> Details
+      </button>
+    );
+  }
+
   return (
-    <aside className="side-panel">
+    <aside className={`side-panel ${narrow ? 'side-panel-drawer' : ''}`}>
       <div className="panel-tabs" role="tablist">
         <button role="tab" aria-selected={tab === 'inspect'} className={tab === 'inspect' ? 'on' : ''} onClick={() => setTab('inspect')}>
           Inspector
@@ -32,6 +46,11 @@ export function SidePanel({ building }: { building: Building }) {
         <button role="tab" aria-selected={tab === 'notes'} className={tab === 'notes' ? 'on' : ''} onClick={() => setTab('notes')}>
           Notes {noteCount > 0 && <span className="count">{noteCount}</span>}
         </button>
+        {narrow && (
+          <button className="icon-btn panel-close" onClick={() => setPanelOpen(false)} aria-label="Hide details panel" title="Hide">
+            <Icon name="close" />
+          </button>
+        )}
       </div>
       <div className="panel-scroll">{tab === 'inspect' ? <Inspector building={building} /> : <NotesList building={building} />}</div>
     </aside>

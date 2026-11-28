@@ -46,7 +46,10 @@ export function Interaction({ building }: { building: Building }) {
       ...new Set([0, ...building.spec.rooms.map((r) => r.floor ?? 0), ...building.pieces.filter((p) => p.isSill).map((p) => p.y1)]),
     ];
 
-    let down: { x: number; y: number; hit: Hit } | null = null;
+    /** The press that may become a click or a drag. `tol` is larger for fingers than for a mouse. */
+    let down: { x: number; y: number; hit: Hit; pointerId: number; tol: number } | null = null;
+    /** Fingers/pointers currently pressed; a second finger means pinch or pan, never a drag or click. */
+    const pressed = new Set<number>();
     let drag: Drag | null = null;
 
     const store = () => useEditor.getState();
@@ -132,8 +135,8 @@ export function Interaction({ building }: { building: Building }) {
     ];
 
     const updateCursor = (hit: Hit) => {
-      const { tool, access, pendingObject } = store();
-      const owner = access === 'owner';
+      const { tool, access, pendingObject, phoneView } = store();
+      const owner = access === 'owner' && !phoneView;
       let c = 'default';
       if (drag) c = 'grabbing';
       else if (tool === 'select' && owner && (hit.kind === 'artwork' || hit.kind === 'partition' || hit.kind === 'object' || partitionOf(hit))) c = 'grab';
@@ -158,10 +161,32 @@ export function Interaction({ building }: { building: Building }) {
     const onDown = (e: PointerEvent) => {
       if (e.button !== 0 || store().mode !== 'design') return;
       if (e.target !== el) return;
+      pressed.add(e.pointerId);
+      if (pressed.size > 1) {
+        // Second finger: hand the gesture to the camera (pinch to zoom, two-finger pan).
+        drag = null;
+        down = null;
+        if (sceneRefs.controls) sceneRefs.controls.enabled = true;
+        return;
+      }
+      const touch = e.pointerType === 'touch';
+      // Touch has no hover, so update ghosts (placement previews) from the press itself.
+      if (touch) hover(e);
       const hit = pick(e);
-      down = { x: e.clientX, y: e.clientY, hit };
-      const { tool, access, selection } = store();
-      if (access !== 'owner') return;
+      down = { x: e.clientX, y: e.clientY, hit, pointerId: e.pointerId, tol: touch ? 12 : CLICK_TOLERANCE_PX };
+      const { tool, access, selection, phoneView } = store();
+      if (access !== 'owner' || phoneView) return;
+      // With a finger, only something already selected can be dragged: a first tap selects it, so
+      // dragging across the view to orbit doesn't move the works by accident.
+      const isSelected = (kind: string, id: string) => selection?.kind === kind && selection.id === id;
+      if (touch) {
+        const pid = partitionOf(hit);
+        const draggable =
+          (hit.kind === 'artwork' && isSelected('artwork', hit.artworkId)) ||
+          (hit.kind === 'object' && isSelected('object', hit.objectId)) ||
+          (pid !== null && (isSelected('partition', pid) || (hit.kind === 'surface' && isSelected('surface', hit.surfaceId))));
+        if (!draggable) return;
+      }
 
       if (tool === 'select' && hit.kind === 'artwork') {
         const a = artworkById(hit.artworkId);
@@ -197,11 +222,17 @@ export function Interaction({ building }: { building: Building }) {
       const st = store();
       if (st.mode !== 'design') return;
       if (drag) {
-        if (!down || Math.hypot(e.clientX - down.x, e.clientY - down.y) < CLICK_TOLERANCE_PX) return;
+        if (!down || e.pointerId !== down.pointerId || Math.hypot(e.clientX - down.x, e.clientY - down.y) < down.tol) return;
         if (drag.kind === 'artwork') return moveArtwork(e, drag);
         return moveOnFloor(e, drag);
       }
-      if (e.target !== el) return;
+      if (e.target !== el || pressed.size > 1) return;
+      hover(e);
+    };
+
+    /** Cursor, hover highlight and placement previews for the point under the pointer. */
+    const hover = (e: PointerEvent) => {
+      const st = store();
       const hit = pick(e);
       updateCursor(hit);
       st.setHoverSurface(hit.kind === 'surface' ? hit.surfaceId : null);
@@ -304,14 +335,16 @@ export function Interaction({ building }: { building: Building }) {
     };
 
     const onUp = (e: PointerEvent) => {
+      pressed.delete(e.pointerId);
+      if (down && e.pointerId !== down.pointerId) return;
       const wasDrag = drag;
       drag = null;
       if (sceneRefs.controls) sceneRefs.controls.enabled = true;
       const d = down;
       down = null;
-      if (!d || store().mode !== 'design') return;
+      if (!d || store().mode !== 'design' || e.type === 'pointercancel') return;
       if (wasDrag?.moved) return;
-      if (Math.hypot(e.clientX - d.x, e.clientY - d.y) > CLICK_TOLERANCE_PX) return;
+      if (Math.hypot(e.clientX - d.x, e.clientY - d.y) > d.tol) return;
       onClick(d.hit);
     };
 
@@ -471,11 +504,13 @@ export function Interaction({ building }: { building: Building }) {
     host.addEventListener('pointerdown', onDown, { capture: true });
     window.addEventListener('pointermove', onMove);
     window.addEventListener('pointerup', onUp);
+    window.addEventListener('pointercancel', onUp);
     el.addEventListener('pointerleave', onLeave);
     return () => {
       host.removeEventListener('pointerdown', onDown, { capture: true });
       window.removeEventListener('pointermove', onMove);
       window.removeEventListener('pointerup', onUp);
+      window.removeEventListener('pointercancel', onUp);
       el.removeEventListener('pointerleave', onLeave);
       el.style.cursor = '';
     };

@@ -33,7 +33,10 @@ export function TopBar({
   const setCutaway = useEditor((s) => s.setCutaway);
   const showFigures = useEditor((s) => s.showFigures);
   const setShowFigures = useEditor((s) => s.setShowFigures);
+  const phone = useEditor((s) => s.phoneView);
   const owner = access === 'owner';
+  /** Phones are view-only even for the owner. */
+  const canEdit = owner && !phone;
   const [editingName, setEditingName] = useState(false);
   const [name, setName] = useState(layout.name);
 
@@ -76,15 +79,15 @@ export function TopBar({
           ) : (
             <button
               className="name-btn"
-              disabled={!owner}
+              disabled={!canEdit}
               onClick={() => setEditingName(true)}
-              title={owner ? 'Rename layout' : undefined}
+              title={canEdit ? 'Rename layout' : undefined}
             >
               {layout.name}
             </button>
           )}
           <span className="save-state">
-            {!owner ? (
+            {!canEdit ? (
               <>
                 <Icon name="eye" size={13} /> View only
               </>
@@ -106,7 +109,7 @@ export function TopBar({
       <div className="topbar-center">
         <div className="segmented" role="tablist" aria-label="View mode">
           <button role="tab" aria-selected={mode === 'design'} className={mode === 'design' ? 'on' : ''} onClick={() => setMode('design')}>
-            <Icon name="cube" size={16} /> Design view
+            <Icon name="cube" size={16} /> Design<span className="seg-extra"> view</span>
           </button>
           <button role="tab" aria-selected={mode === 'visit'} className={mode === 'visit' ? 'on' : ''} onClick={() => setMode('visit')}>
             <Icon name="walk" size={16} /> Visit
@@ -123,7 +126,7 @@ export function TopBar({
         >
           <Icon name="person" size={16} /> <span className="btn-label">{showFigures ? 'Figures: on' : 'Figures: off'}</span>
         </button>
-        {mode === 'design' && (
+        {mode === 'design' && !phone && (
           <button
             className={`btn btn-ghost btn-sm ${cutaway ? 'is-on' : ''}`}
             onClick={() => setCutaway(!cutaway)}
@@ -132,7 +135,10 @@ export function TopBar({
             <Icon name="wall" size={16} /> <span className="btn-label">{cutaway ? 'Walls: cutaway' : 'Walls: up'}</span>
           </button>
         )}
-        {owner && (
+        <button className="btn btn-ghost btn-pdf" onClick={onExport} title="Download a PDF of the hang: plans and walls" aria-label="Download PDF">
+          <Icon name="download" size={16} /> <span className="btn-label">PDF</span>
+        </button>
+        {canEdit && (
           <>
             <div className="btn-group">
               <button className="icon-btn" disabled={!canUndo} onClick={undo} title="Undo (Ctrl+Z)" aria-label="Undo">
@@ -154,9 +160,6 @@ export function TopBar({
                 </button>
               </span>
             )}
-            <button className="btn btn-ghost" onClick={onExport} title="Download a PDF of the hang: plans and walls">
-              <Icon name="download" size={16} /> <span className="btn-label">PDF</span>
-            </button>
             <button className="btn btn-primary" onClick={onSave} disabled={saving || !dirty} title="Save (Ctrl+S)">
               <Icon name="save" size={16} /> {saving ? 'Saving…' : 'Save'}
             </button>

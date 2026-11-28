@@ -98,6 +98,10 @@ interface EditorState {
   visitLocked: boolean;
   /** True when the browser granted pointer lock; false means free-look fallback. */
   visitMouseLock: boolean;
+  /** Phone-sized screen: the editor is view-only (look around, visit, PDF). Set by the page. */
+  phoneView: boolean;
+  /** Tablet / narrow window: whether the side-panel drawer is open over the 3D view. */
+  panelOpen: boolean;
 
   /** assetId -> object URL; resolved outside the canvas (no React context in R3F). */
   assetUrls: Record<ID, string>;
@@ -128,6 +132,8 @@ interface EditorActions {
   setMode(mode: Mode): void;
   setTool(tool: Tool): void;
   select(sel: Selection): void;
+  setPanelOpen(open: boolean): void;
+  setPhoneView(phone: boolean): void;
   setPending(p: PendingArtwork | null): void;
   setPendingObject(p: PendingObject | null): void;
   setGhost(g: Ghost | null): void;
@@ -177,6 +183,8 @@ const initial: EditorState = {
   visitFocusLabel: null,
   visitLocked: false,
   visitMouseLock: false,
+  phoneView: false,
+  panelOpen: false,
   assetUrls: {},
   notes: [],
   activeNoteId: null,
@@ -188,8 +196,9 @@ export const useEditor = create<EditorState & EditorActions>((set, get) => ({
   ...initial,
 
   init: ({ user, layout, access }) =>
-    set({ ...initial, assetUrls: get().assetUrls, noteActions: get().noteActions, showFigures: get().showFigures, user, layout, access }),
-  reset: () => set({ ...initial, assetUrls: get().assetUrls, noteActions: get().noteActions, showFigures: get().showFigures }),
+    set({ ...initial, assetUrls: get().assetUrls, noteActions: get().noteActions, showFigures: get().showFigures, phoneView: get().phoneView, user, layout, access }),
+  reset: () =>
+    set({ ...initial, assetUrls: get().assetUrls, noteActions: get().noteActions, showFigures: get().showFigures, phoneView: get().phoneView }),
 
   receiveRemote: (layout) => {
     const s = get();
@@ -245,7 +254,10 @@ export const useEditor = create<EditorState & EditorActions>((set, get) => ({
       pending: tool === 'place' ? s.pending : null,
       pendingObject: tool === 'place' ? s.pendingObject : null,
     })),
-  select: (selection) => set({ selection }),
+  // Selecting something opens the side-panel drawer on tablets so its details show.
+  select: (selection) => set((s) => ({ selection, panelOpen: selection ? true : s.panelOpen })),
+  setPanelOpen: (panelOpen) => set({ panelOpen }),
+  setPhoneView: (phoneView) => set({ phoneView }),
   setPending: (pending) => set({ pending, pendingObject: null, tool: pending ? 'place' : 'select', ghost: null }),
   setPendingObject: (pendingObject) =>
     set({ pendingObject, pending: null, tool: pendingObject ? 'place' : 'select', floorGhost: null }),
