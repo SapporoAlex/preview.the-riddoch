@@ -56,12 +56,34 @@ function clearSession() {
   else localStorage.removeItem(SESSION_KEY);
 }
 
+/** The automatic user for the no-sign-in test version. */
+const GUEST_ID = 'usr_guest';
+
 export class LocalAuthService implements AuthService, UserDirectory {
+  constructor(private opts: { guest?: boolean } = {}) {}
+
   private users(): StoredUser[] {
     return kv.get<StoredUser[]>(USERS_KEY, []);
   }
 
+  private guest(): User {
+    const users = this.users();
+    const existing = users.find((u) => u.id === GUEST_ID);
+    if (existing) return stripSecrets(existing);
+    const user: StoredUser = {
+      id: GUEST_ID,
+      email: 'guest@this-computer',
+      displayName: 'You',
+      createdAt: nowIso(),
+      salt: '',
+      passwordHash: '',
+    };
+    kv.set(USERS_KEY, [...users, user]);
+    return stripSecrets(user);
+  }
+
   async getCurrentUser(): Promise<User | null> {
+    if (this.opts.guest) return this.guest();
     const id = readSession();
     if (!id) return null;
     const u = this.users().find((x) => x.id === id);
@@ -112,6 +134,7 @@ export class LocalAuthService implements AuthService, UserDirectory {
   }
 
   async signOut(): Promise<void> {
+    if (this.opts.guest) return;
     clearSession();
   }
 

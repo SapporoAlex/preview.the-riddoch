@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useAuth, useUser } from '@/auth/AuthProvider';
 import { DEFAULT_BUILDING_ID, getBuilding } from '@/domain/building';
 import type { LayoutSummary } from '@/domain/types';
+import { FUTURE_SHARING } from '@/lib/features';
 import { initials, timeAgo } from '@/lib/format';
 import { navigate } from '@/lib/router';
 import { useServices } from '@/services';
@@ -15,7 +16,7 @@ const DEFAULT_BUILDING = getBuilding(DEFAULT_BUILDING_ID);
 export function LayoutsPage() {
   const user = useUser();
   const { signOut } = useAuth();
-  const { layouts, shares } = useServices();
+  const { layouts, shares, features } = useServices();
   const [owned, setOwned] = useState<LayoutSummary[] | null>(null);
   const [shared, setShared] = useState<LayoutSummary[] | null>(null);
   const [creating, setCreating] = useState(false);
@@ -23,10 +24,13 @@ export function LayoutsPage() {
   const [deleting, setDeleting] = useState<LayoutSummary | null>(null);
 
   const refresh = useCallback(async () => {
-    const [mine, sharedWithMe] = await Promise.all([layouts.listOwned(user.id), shares.listSharedWith(user.id)]);
+    const [mine, sharedWithMe] = await Promise.all([
+      layouts.listOwned(user.id),
+      features.sharing ? shares.listSharedWith(user.id) : Promise.resolve([]),
+    ]);
     setOwned(mine);
     setShared(await layouts.listByIds(sharedWithMe.map((s) => s.layoutId)));
-  }, [layouts, shares, user.id]);
+  }, [layouts, shares, features.sharing, user.id]);
 
   useEffect(() => {
     refresh();
@@ -54,6 +58,13 @@ export function LayoutsPage() {
           <span className="brand-mark" />
           Gallery Studio
         </div>
+        {!features.accounts ? (
+          <div className="dash-user">
+            <span className="local-badge" title="Layouts and images are saved in this browser. Clearing your browser data removes them.">
+              <Icon name="save" size={14} /> Test version · saved on this device
+            </span>
+          </div>
+        ) : (
         <div className="dash-user">
           <span className="avatar" title={user.email}>
             {initials(user.displayName)}
@@ -66,9 +77,11 @@ export function LayoutsPage() {
             <Icon name="logout" /> Sign out
           </button>
         </div>
+        )}
       </header>
 
       <main className="dash-main">
+        {!features.accounts && <TestVersionNotice />}
         <div className="dash-title-row">
           <div>
             <h1>Your layouts</h1>
@@ -115,6 +128,17 @@ export function LayoutsPage() {
           </div>
         )}
 
+        {!features.sharing ? (
+          <div className="dash-title-row dash-section is-future" title={FUTURE_SHARING}>
+            <div>
+              <h2>
+                Shared with you <span className="soon-pill">Coming later</span>
+              </h2>
+              <p className="muted">{FUTURE_SHARING}</p>
+            </div>
+          </div>
+        ) : (
+        <>
         <div className="dash-title-row dash-section">
           <div>
             <h2>Shared with you</h2>
@@ -129,6 +153,8 @@ export function LayoutsPage() {
           </div>
         ) : (
           <p className="muted small">{shared === null ? 'Loading…' : 'Nothing has been shared with you yet.'}</p>
+        )}
+        </>
         )}
       </main>
 
@@ -292,5 +318,56 @@ function NameDialog(props: {
         />
       </label>
     </Modal>
+  );
+}
+
+const NOTICE_KEY = 'gallery-studio:test-notice-dismissed';
+
+/** The opening explanation for the no-sign-in test version. Can be hidden; the header badge stays. */
+function TestVersionNotice() {
+  const [open, setOpen] = useState(() => {
+    try {
+      return localStorage.getItem(NOTICE_KEY) !== '1';
+    } catch {
+      return true;
+    }
+  });
+  if (!open) return null;
+  const hide = () => {
+    setOpen(false);
+    try {
+      localStorage.setItem(NOTICE_KEY, '1');
+    } catch {
+      /* private window: it just shows again next time */
+    }
+  };
+  return (
+    <section className="test-notice" aria-label="About this test version">
+      <div className="test-notice-icon">
+        <Icon name="save" size={20} />
+      </div>
+      <div className="test-notice-body">
+        <h2>Welcome to the Gallery Studio test version</h2>
+        <p>
+          Plan a hang in a 3D model of the gallery: hang images on the walls, paint them, add movable walls and
+          objects, then walk through it in Visit mode.
+        </p>
+        <ul>
+          <li>
+            <strong>No sign-in needed.</strong> Everything you make is saved in this web browser, on this device only.
+          </li>
+          <li>
+            <strong>Clearing your browser data deletes your layouts.</strong> Another browser or device starts empty.
+          </li>
+          <li>
+            <strong>To keep or send a layout,</strong> open it and click <em>PDF</em> to download its plans and walls.
+          </li>
+          <li>Sharing layouts with other users who have an account is planned for a future version.</li>
+        </ul>
+      </div>
+      <button className="icon-btn" onClick={hide} aria-label="Hide this message" title="Hide this message">
+        <Icon name="close" />
+      </button>
+    </section>
   );
 }

@@ -73,3 +73,17 @@ supabase/
 5. `subscribe()` methods currently use BroadcastChannel; back them with websockets or SSE for live updates.
 6. Layouts carry `schemaVersion` and a `buildingId`, so real floor plans can be added as new
    `BuildingSpec`s in `domain/building.ts` and old layouts can be migrated.
+
+## Test version on GitHub Pages
+
+Every push to `main` builds the app and publishes it with GitHub Pages
+(`.github/workflows/pages.yml`). It runs in local mode: no sign-in, and each visitor's layouts and
+images are saved in their own browser. Sharing is shown as a future feature, and **PDF** in the editor
+downloads a layout's plans and wall elevations.
+
+One-time setup: on GitHub, open the repository's **Settings → Pages** and set **Source** to
+**GitHub Actions**. The site appears at `https://<user>.github.io/<repo>/`. On a free GitHub account the
+repository must be public for Pages to work.
+
+To bring back local sign-in accounts during development (for trying sharing between two accounts in one
+browser), put `VITE_LOCAL_ACCOUNTS=true` in `.env.local`.

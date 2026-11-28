@@ -77,6 +77,12 @@ export interface AssetStore {
 export interface Services {
   /** Which implementation is running; the UI uses it only for explanatory notes. */
   backend: 'local' | 'supabase';
+  /**
+   * accounts: false = no sign-in; everyone uses one automatic guest user (the
+   * GitHub Pages test version). sharing: false = sharing and "Shared with you"
+   * are shown as a future feature.
+   */
+  features: { accounts: boolean; sharing: boolean };
   auth: AuthService;
   users: UserDirectory;
   layouts: LayoutRepository;

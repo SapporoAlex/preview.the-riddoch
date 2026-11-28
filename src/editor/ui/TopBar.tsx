@@ -1,13 +1,24 @@
 import { useState } from 'react';
 import { useUser } from '@/auth/AuthProvider';
+import { FUTURE_SHARING } from '@/lib/features';
 import { useServices } from '@/services';
 import { Icon } from '@/ui/Icon';
 import { errorMessage, toast } from '@/ui/toast';
 import { useEditor } from '../store';
 
-export function TopBar({ onBack, onSave, onShare }: { onBack(): void; onSave(): void; onShare(): void }) {
+export function TopBar({
+  onBack,
+  onSave,
+  onShare,
+  onExport,
+}: {
+  onBack(): void;
+  onSave(): void;
+  onShare(): void;
+  onExport(): void;
+}) {
   const user = useUser();
-  const { layouts } = useServices();
+  const { layouts, features } = useServices();
   const layout = useEditor((s) => s.layout)!;
   const access = useEditor((s) => s.access);
   const dirty = useEditor((s) => s.dirty);
@@ -131,8 +142,20 @@ export function TopBar({ onBack, onSave, onShare }: { onBack(): void; onSave(): 
                 <Icon name="redo" />
               </button>
             </div>
-            <button className="btn btn-ghost" onClick={onShare} title="Share">
-              <Icon name="share" size={16} /> <span className="btn-label">Share</span>
+            {features.sharing ? (
+              <button className="btn btn-ghost" onClick={onShare} title="Share">
+                <Icon name="share" size={16} /> <span className="btn-label">Share</span>
+              </button>
+            ) : (
+              // A disabled <button> gets no hover events in some browsers, so the tooltip sits on a wrapper.
+              <span className="future-wrap" tabIndex={0} aria-label={`Share. ${FUTURE_SHARING}`} data-tip={FUTURE_SHARING}>
+                <button className="btn btn-ghost" disabled aria-hidden tabIndex={-1}>
+                  <Icon name="share" size={16} /> <span className="btn-label">Share</span>
+                </button>
+              </span>
+            )}
+            <button className="btn btn-ghost" onClick={onExport} title="Download a PDF of the hang: plans and walls">
+              <Icon name="download" size={16} /> <span className="btn-label">PDF</span>
             </button>
             <button className="btn btn-primary" onClick={onSave} disabled={saving || !dirty} title="Save (Ctrl+S)">
               <Icon name="save" size={16} /> {saving ? 'Saving…' : 'Save'}

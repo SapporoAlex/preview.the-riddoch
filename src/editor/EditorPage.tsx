@@ -139,6 +139,29 @@ export default function EditorPage({ layoutId }: { layoutId: string }) {
     }
   }, [services, user]);
 
+  const [exporting, setExporting] = useState(false);
+  const exportPdf = useCallback(async () => {
+    const st = useEditor.getState();
+    if (!st.layout || exporting) return;
+    setExporting(true);
+    toast('Preparing PDF…');
+    try {
+      // jsPDF is loaded only when someone asks for a PDF.
+      const { exportLayoutPdf } = await import('./pdf/exportPdf');
+      await exportLayoutPdf({
+        layout: st.layout,
+        building: getBuilding(st.layout.buildingId),
+        knownUrls: st.assetUrls,
+        getUrl: (id) => services.assets.getUrl(id),
+      });
+      toast('PDF downloaded', 'success');
+    } catch (err) {
+      toast(`Couldn’t make the PDF: ${errorMessage(err)}`, 'error');
+    } finally {
+      setExporting(false);
+    }
+  }, [exporting, services.assets]);
+
   const leave = useCallback(() => {
     if (useEditor.getState().dirty && !confirm('You have unsaved changes. Leave without saving?')) return;
     useEditor.setState({ dirty: false });
@@ -253,7 +276,7 @@ export default function EditorPage({ layoutId }: { layoutId: string }) {
 
   return (
     <div className={`editor mode-${mode}`}>
-      <TopBar onBack={leave} onSave={save} onShare={() => setShareOpen(true)} />
+      <TopBar onBack={leave} onSave={save} onShare={() => setShareOpen(true)} onExport={exportPdf} />
       <div className="editor-body">
         {mode === 'design' && <ToolRail onUpload={() => setUploadOpen(true)} />}
         <div className="viewport">

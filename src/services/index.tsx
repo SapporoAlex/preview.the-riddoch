@@ -25,10 +25,17 @@ export function createServices(): Services {
   return url && key ? createSupabaseServices(url, key) : createLocalServices();
 }
 
+/**
+ * Local mode runs as a single automatic guest (no sign-in, no sharing): data
+ * stays on this computer. Set VITE_LOCAL_ACCOUNTS=true to bring back local
+ * accounts, which lets you try sharing between two accounts in one browser.
+ */
 export function createLocalServices(): Services {
-  const auth = new LocalAuthService();
+  const accounts = import.meta.env.VITE_LOCAL_ACCOUNTS === 'true';
+  const auth = new LocalAuthService({ guest: !accounts });
   return {
     backend: 'local',
+    features: { accounts, sharing: accounts },
     auth,
     users: auth,
     layouts: new LocalLayoutRepository(auth),
@@ -44,6 +51,7 @@ export function createSupabaseServices(url: string, anonKey: string): Services {
   const assets = new SupabaseAssetStore(sb);
   return {
     backend: 'supabase',
+    features: { accounts: true, sharing: true },
     auth,
     users: auth,
     // After each save, clear out images no layout uses so they stop counting toward the limit.
